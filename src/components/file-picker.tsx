@@ -24,6 +24,7 @@ const FilePicker: Component<FilePickerProps> = (props) => {
   const [cachedGitFiles, setCachedGitFiles] = createSignal<FileItem[]>([])
 
   let containerRef: HTMLDivElement | undefined
+  let gitFilesFetched = false
 
   async function fetchGitFiles() {
     if (!props.instanceClient) {
@@ -31,11 +32,12 @@ const FilePicker: Component<FilePickerProps> = (props) => {
       return
     }
 
-    if (cachedGitFiles().length > 0) {
-      console.log("[FilePicker] Git files already cached:", cachedGitFiles().length)
+    if (gitFilesFetched) {
+      console.log("[FilePicker] Git files already fetched")
       return
     }
 
+    gitFilesFetched = true
     console.log("[FilePicker] Fetching git files...")
     const startTime = Date.now()
 
@@ -44,7 +46,7 @@ const FilePicker: Component<FilePickerProps> = (props) => {
       const elapsed = Date.now() - startTime
       console.log(`[FilePicker] Git files response received in ${elapsed}ms:`, gitResponse)
 
-      if (gitResponse?.data) {
+      if (gitResponse?.data && gitResponse.data.length > 0) {
         const gitFiles: FileItem[] = gitResponse.data.map((file: any) => ({
           path: file.path,
           added: file.added,
@@ -54,13 +56,11 @@ const FilePicker: Component<FilePickerProps> = (props) => {
         console.log(`[FilePicker] Cached ${gitFiles.length} git files`)
         setCachedGitFiles(gitFiles)
       } else {
-        console.log("[FilePicker] Git response has no data:", gitResponse)
-        setCachedGitFiles([])
+        console.log("[FilePicker] Git response has no data or empty array")
       }
     } catch (error) {
       const elapsed = Date.now() - startTime
       console.warn(`[FilePicker] Git files not available after ${elapsed}ms:`, error)
-      setCachedGitFiles([])
     }
   }
 
@@ -117,22 +117,26 @@ const FilePicker: Component<FilePickerProps> = (props) => {
   }
 
   let lastQuery = ""
+  let isInitialized = false
 
   createEffect(() => {
-    console.log(`[FilePicker] Effect triggered - open: ${props.open}, query: "${props.searchQuery}"`)
+    console.log(
+      `[FilePicker] Effect triggered - open: ${props.open}, query: "${props.searchQuery}", gitFilesFetched: ${gitFilesFetched}, isInitialized: ${isInitialized}`,
+    )
 
-    if (props.open) {
-      if (cachedGitFiles().length === 0) {
-        console.log("[FilePicker] Triggering git files fetch")
-        fetchGitFiles()
-      }
-      if (props.searchQuery !== lastQuery) {
-        console.log(`[FilePicker] Query changed from "${lastQuery}" to "${props.searchQuery}"`)
-        lastQuery = props.searchQuery
-        fetchFiles(props.searchQuery)
-      } else {
-        console.log(`[FilePicker] Query unchanged: "${props.searchQuery}"`)
-      }
+    if (props.open && !isInitialized) {
+      isInitialized = true
+      console.log("[FilePicker] First open - fetching git files and initial files")
+      fetchGitFiles()
+      fetchFiles(props.searchQuery)
+      lastQuery = props.searchQuery
+      return
+    }
+
+    if (props.open && props.searchQuery !== lastQuery) {
+      console.log(`[FilePicker] Query changed from "${lastQuery}" to "${props.searchQuery}"`)
+      lastQuery = props.searchQuery
+      fetchFiles(props.searchQuery)
     }
   })
 
