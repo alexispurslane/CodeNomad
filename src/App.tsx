@@ -1,13 +1,16 @@
-import { Component, onMount, Show, createMemo, createEffect } from "solid-js"
+import { Component, onMount, onCleanup, Show, createMemo, createEffect } from "solid-js"
 import type { Session } from "./types/session"
 import EmptyState from "./components/empty-state"
 import SessionPicker from "./components/session-picker"
+import CommandPalette from "./components/command-palette"
 import InstanceTabs from "./components/instance-tabs"
 import SessionTabs from "./components/session-tabs"
 import MessageStream from "./components/message-stream"
 import PromptInput from "./components/prompt-input"
 import LogsView from "./components/logs-view"
 import { initMarkdown } from "./lib/markdown"
+import { createCommandRegistry } from "./lib/commands"
+import type { Command } from "./lib/commands"
 import {
   hasInstances,
   isSelectingFolder,
@@ -42,13 +45,21 @@ import {
   sendMessage,
   updateSessionAgent,
   updateSessionModel,
+  agents,
 } from "./stores/sessions"
 import { setupTabKeyboardShortcuts } from "./lib/keyboard"
+import { isOpen as isCommandPaletteOpen, showCommandPalette, hideCommandPalette } from "./stores/command-palette"
+import { registerNavigationShortcuts } from "./lib/shortcuts/navigation"
+import { registerInputShortcuts } from "./lib/shortcuts/input"
+import { registerAgentShortcuts } from "./lib/shortcuts/agent"
+import { registerEscapeShortcut } from "./lib/shortcuts/escape"
+import { keyboardRegistry } from "./lib/keyboard-registry"
 
 const SessionView: Component<{
   sessionId: string
   activeSessions: Map<string, Session>
   instanceId: string
+  instanceFolder: string
 }> = (props) => {
   const session = () => props.activeSessions.get(props.sessionId)
 
@@ -90,6 +101,7 @@ const SessionView: Component<{
           />
           <PromptInput
             instanceId={props.instanceId}
+            instanceFolder={props.instanceFolder}
             sessionId={s().id}
             onSend={handleSendMessage}
             agent={s().agent}
@@ -104,6 +116,8 @@ const SessionView: Component<{
 }
 
 const App: Component = () => {
+  const commandRegistry = createCommandRegistry()
+
   const activeInstance = createMemo(() => getActiveInstance())
 
   const activeSessions = createMemo(() => {
@@ -175,10 +189,243 @@ const App: Component = () => {
     showSessionPicker(instanceId)
   }
 
+  function setupCommands() {
+    commandRegistry.register({
+      id: "init",
+      label: "Initialize AGENTS.md",
+      description: "Create or update AGENTS.md file",
+      keywords: ["/init", "agents", "initialize"],
+      action: async () => {
+        const instance = activeInstance()
+        const sessionId = activeSessionIdForInstance()
+        if (!instance || !instance.client || !sessionId || sessionId === "logs") return
+
+        try {
+          await instance.client.session.init({ path: { id: sessionId } })
+          console.log("Initialized AGENTS.md")
+        } catch (error) {
+          console.error("Failed to initialize AGENTS.md:", error)
+        }
+      },
+    })
+
+    commandRegistry.register({
+      id: "compact",
+      label: "Compact Session",
+      description: "Summarize and compact the current session",
+      keywords: ["/compact", "summarize", "compress"],
+      action: async () => {
+        const instance = activeInstance()
+        const sessionId = activeSessionIdForInstance()
+        if (!instance || !instance.client || !sessionId || sessionId === "logs") return
+
+        try {
+          await instance.client.session.summarize({ path: { id: sessionId } })
+          console.log("Session compacted")
+        } catch (error) {
+          console.error("Failed to compact session:", error)
+        }
+      },
+    })
+
+    commandRegistry.register({
+      id: "undo",
+      label: "Undo Last Message",
+      description: "Revert the last message",
+      keywords: ["/undo", "revert", "undo"],
+      action: async () => {
+        const instance = activeInstance()
+        const sessionId = activeSessionIdForInstance()
+        if (!instance || !instance.client || !sessionId || sessionId === "logs") return
+
+        try {
+          await instance.client.session.revert({ path: { id: sessionId } })
+          console.log("Last message reverted")
+        } catch (error) {
+          console.error("Failed to revert message:", error)
+        }
+      },
+    })
+
+    commandRegistry.register({
+      id: "thinking",
+      label: "Toggle Thinking Blocks",
+      description: "Show/hide AI thinking process",
+      keywords: ["/thinking", "toggle", "show", "hide"],
+      action: () => {
+        console.log("Toggle thinking blocks (not implemented)")
+      },
+    })
+
+    commandRegistry.register({
+      id: "help",
+      label: "Show Help",
+      description: "Display keyboard shortcuts and help",
+      keywords: ["/help", "shortcuts", "help"],
+      action: () => {
+        console.log("Show help modal (not implemented)")
+      },
+    })
+
+    commandRegistry.register({
+      id: "new-session",
+      label: "New Session",
+      description: "Create a new session",
+      shortcut: { key: "N", meta: true, shift: true },
+      action: async () => {
+        const instance = activeInstance()
+        if (!instance) return
+        await handleNewSession(instance.id)
+      },
+    })
+
+    commandRegistry.register({
+      id: "open-model-selector",
+      label: "Open Model Selector",
+      description: "Choose a different model",
+      shortcut: { key: "M", meta: true, shift: true },
+      action: () => {
+        const modelInput = document.querySelector("[data-model-selector] input") as HTMLInputElement
+        modelInput?.focus()
+      },
+    })
+
+    commandRegistry.register({
+      id: "focus-prompt",
+      label: "Focus Prompt Input",
+      description: "Jump to the message input",
+      shortcut: { key: "P", meta: true },
+      action: () => {
+        const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
+        textarea?.focus()
+      },
+    })
+
+    commandRegistry.register({
+      id: "open-agent-selector",
+      label: "Open Agent Selector",
+      description: "Choose a different agent",
+      action: () => {
+        const agentButton = document.querySelector("[data-agent-selector]") as HTMLElement
+        agentButton?.click()
+      },
+    })
+  }
+
+  function handleExecuteCommand(commandId: string) {
+    commandRegistry.execute(commandId)
+  }
+
+  function handleCycleAgent() {
+    const instance = activeInstance()
+    const sessionId = activeSessionIdForInstance()
+    if (!instance || !sessionId || sessionId === "logs") return
+
+    const sessions = getSessions(instance.id)
+    const session = sessions.find((s) => s.id === sessionId)
+    if (!session) return
+
+    const instanceAgents = agents().get(instance.id) || []
+    const availableAgents =
+      session.parentId === null ? instanceAgents.filter((a) => a.mode !== "subagent") : instanceAgents
+
+    if (availableAgents.length === 0) return
+
+    const currentIndex = availableAgents.findIndex((a) => a.name === session.agent)
+    const nextIndex = (currentIndex + 1) % availableAgents.length
+    const nextAgent = availableAgents[nextIndex]
+
+    if (nextAgent) {
+      updateSessionAgent(instance.id, sessionId, nextAgent.name).catch(console.error)
+    }
+  }
+
+  function handleCycleAgentReverse() {
+    const instance = activeInstance()
+    const sessionId = activeSessionIdForInstance()
+    if (!instance || !sessionId || sessionId === "logs") return
+
+    const sessions = getSessions(instance.id)
+    const session = sessions.find((s) => s.id === sessionId)
+    if (!session) return
+
+    const instanceAgents = agents().get(instance.id) || []
+    const availableAgents =
+      session.parentId === null ? instanceAgents.filter((a) => a.mode !== "subagent") : instanceAgents
+
+    if (availableAgents.length === 0) return
+
+    const currentIndex = availableAgents.findIndex((a) => a.name === session.agent)
+    const prevIndex = currentIndex <= 0 ? availableAgents.length - 1 : currentIndex - 1
+    const prevAgent = availableAgents[prevIndex]
+
+    if (prevAgent) {
+      updateSessionAgent(instance.id, sessionId, prevAgent.name).catch(console.error)
+    }
+  }
+
   onMount(() => {
     initMarkdown(false).catch(console.error)
 
-    setupTabKeyboardShortcuts(handleSelectFolder, handleNewSession, handleCloseSession)
+    setupCommands()
+
+    setupTabKeyboardShortcuts(
+      handleSelectFolder,
+      handleCloseInstance,
+      handleNewSession,
+      handleCloseSession,
+      showCommandPalette,
+    )
+
+    registerNavigationShortcuts()
+    registerInputShortcuts(
+      () => {
+        const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
+        if (textarea) textarea.value = ""
+      },
+      () => {
+        const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
+        textarea?.focus()
+      },
+    )
+    registerAgentShortcuts(handleCycleAgent, handleCycleAgentReverse, () => {
+      const modelInput = document.querySelector("[data-model-selector] input") as HTMLInputElement
+      modelInput?.focus()
+    })
+    registerEscapeShortcut(
+      () => {
+        const instance = activeInstance()
+        if (!instance) return false
+        const sessions = getSessions(instance.id)
+        const sessionId = activeSessionIdForInstance()
+        const session = sessions.find((s) => s.id === sessionId)
+        if (!session) return false
+        const lastMessage = session.messages[session.messages.length - 1]
+        return lastMessage?.status === "streaming"
+      },
+      () => {
+        console.log("Interrupt session (not implemented)")
+      },
+      () => {
+        const active = document.activeElement as HTMLElement
+        active?.blur()
+      },
+      hideCommandPalette,
+    )
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const shortcut = keyboardRegistry.findMatch(e)
+      if (shortcut) {
+        e.preventDefault()
+        shortcut.handler()
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    onCleanup(() => {
+      window.removeEventListener("keydown", handleKeyDown)
+    })
 
     window.electronAPI.onNewInstance(() => {
       handleSelectFolder()
@@ -260,6 +507,7 @@ const App: Component = () => {
                               sessionId={activeSessionIdForInstance()!}
                               activeSessions={activeSessions()}
                               instanceId={activeInstance()!.id}
+                              instanceFolder={activeInstance()!.folder}
                             />
                           </Show>
                         }
@@ -280,6 +528,13 @@ const App: Component = () => {
       <Show when={sessionPickerInstance()}>
         {(instanceId) => <SessionPicker instanceId={instanceId()} open={true} onClose={hideSessionPicker} />}
       </Show>
+
+      <CommandPalette
+        open={isCommandPaletteOpen()}
+        onClose={hideCommandPalette}
+        commands={commandRegistry.getAll()}
+        onExecute={handleExecuteCommand}
+      />
     </div>
   )
 }

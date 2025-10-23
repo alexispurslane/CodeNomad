@@ -1,13 +1,21 @@
 import { instances, activeInstanceId, setActiveInstanceId } from "../stores/instances"
-import { activeSessionId, setActiveSession, getSessions } from "../stores/sessions"
+import { activeSessionId, setActiveSession, getSessions, activeParentSessionId } from "../stores/sessions"
 
 export function setupTabKeyboardShortcuts(
   handleNewInstance: () => void,
+  handleCloseInstance: (instanceId: string) => void,
   handleNewSession: (instanceId: string) => void,
   handleCloseSession: (instanceId: string, sessionId: string) => void,
+  handleCommandPalette: () => void,
 ) {
   window.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key >= "1" && e.key <= "9") {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p") {
+      e.preventDefault()
+      handleCommandPalette()
+      return
+    }
+
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key >= "1" && e.key <= "9") {
       e.preventDefault()
       const index = parseInt(e.key) - 1
       const instanceIds = Array.from(instances().keys())
@@ -16,12 +24,30 @@ export function setupTabKeyboardShortcuts(
       }
     }
 
-    if ((e.metaKey || e.ctrlKey) && e.key === "n") {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key >= "1" && e.key <= "9") {
+      e.preventDefault()
+      const instanceId = activeInstanceId()
+      if (!instanceId) return
+
+      const index = parseInt(e.key) - 1
+      const parentId = activeParentSessionId().get(instanceId)
+      if (!parentId) return
+
+      const sessions = getSessions(instanceId)
+      const sessionFamily = sessions.filter((s) => s.id === parentId || s.parentId === parentId)
+      const allTabs = sessionFamily.map((s) => s.id).concat(["logs"])
+
+      if (allTabs[index]) {
+        setActiveSession(instanceId, allTabs[index])
+      }
+    }
+
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault()
       handleNewInstance()
     }
 
-    if ((e.metaKey || e.ctrlKey) && e.key === "t") {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault()
       const instanceId = activeInstanceId()
       if (instanceId) {
@@ -29,7 +55,15 @@ export function setupTabKeyboardShortcuts(
       }
     }
 
-    if ((e.metaKey || e.ctrlKey) && e.key === "w") {
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "w") {
+      e.preventDefault()
+      const instanceId = activeInstanceId()
+      if (instanceId) {
+        handleCloseInstance(instanceId)
+      }
+    }
+
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "w") {
       e.preventDefault()
       const instanceId = activeInstanceId()
       if (!instanceId) return

@@ -1,0 +1,157 @@
+import { Component, createSignal, For, Show, onMount, createEffect } from "solid-js"
+import { Dialog } from "@kobalte/core/dialog"
+import type { Command } from "../lib/commands"
+import Kbd from "./kbd"
+
+interface CommandPaletteProps {
+  open: boolean
+  onClose: () => void
+  commands: Command[]
+  onExecute: (commandId: string) => void
+}
+
+function buildShortcutString(shortcut: Command["shortcut"]): string {
+  if (!shortcut) return ""
+
+  const parts: string[] = []
+
+  if (shortcut.meta || shortcut.ctrl) parts.push("cmd")
+  if (shortcut.shift) parts.push("shift")
+  if (shortcut.alt) parts.push("alt")
+  parts.push(shortcut.key)
+
+  return parts.join("+")
+}
+
+const CommandPalette: Component<CommandPaletteProps> = (props) => {
+  const [query, setQuery] = createSignal("")
+  const [selectedIndex, setSelectedIndex] = createSignal(0)
+  let inputRef: HTMLInputElement | undefined
+
+  const filteredCommands = () => {
+    const q = query().toLowerCase()
+    if (!q) return props.commands
+
+    return props.commands.filter((cmd) => {
+      const labelMatch = cmd.label.toLowerCase().includes(q)
+      const descMatch = cmd.description.toLowerCase().includes(q)
+      const keywordMatch = cmd.keywords?.some((k) => k.toLowerCase().includes(q))
+      return labelMatch || descMatch || keywordMatch
+    })
+  }
+
+  createEffect(() => {
+    if (props.open) {
+      setQuery("")
+      setSelectedIndex(0)
+      setTimeout(() => inputRef?.focus(), 100)
+    }
+  })
+
+  createEffect(() => {
+    const max = Math.max(0, filteredCommands().length - 1)
+    if (selectedIndex() > max) {
+      setSelectedIndex(max)
+    }
+  })
+
+  function handleKeyDown(e: KeyboardEvent) {
+    const filtered = filteredCommands()
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault()
+      setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1))
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault()
+      setSelectedIndex((i) => Math.max(i - 1, 0))
+    } else if (e.key === "Enter") {
+      e.preventDefault()
+      const selected = filtered[selectedIndex()]
+      if (selected) {
+        props.onExecute(selected.id)
+        props.onClose()
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault()
+      props.onClose()
+    }
+  }
+
+  function handleCommandClick(commandId: string) {
+    props.onExecute(commandId)
+    props.onClose()
+  }
+
+  return (
+    <Dialog open={props.open} onOpenChange={(open) => !open && props.onClose()}>
+      <Dialog.Portal>
+        <Dialog.Overlay class="fixed inset-0 bg-black/50 z-50" />
+        <div class="fixed inset-0 z-50 flex items-start justify-center pt-[20vh]">
+          <Dialog.Content
+            class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl max-h-[60vh] flex flex-col"
+            onKeyDown={handleKeyDown}
+          >
+            <Dialog.Title class="sr-only">Command Palette</Dialog.Title>
+            <Dialog.Description class="sr-only">Search and execute commands</Dialog.Description>
+
+            <div class="p-4 border-b border-gray-200 dark:border-gray-700">
+              <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                  />
+                </svg>
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={query()}
+                  onInput={(e) => {
+                    setQuery(e.currentTarget.value)
+                    setSelectedIndex(0)
+                  }}
+                  placeholder="Type a command or search..."
+                  class="flex-1 bg-transparent outline-none text-gray-900 dark:text-gray-100 placeholder-gray-400"
+                />
+              </div>
+            </div>
+
+            <div class="flex-1 overflow-y-auto">
+              <Show
+                when={filteredCommands().length > 0}
+                fallback={<div class="p-8 text-center text-gray-500">No commands found for "{query()}"</div>}
+              >
+                <For each={filteredCommands()}>
+                  {(command, index) => (
+                    <button
+                      type="button"
+                      onClick={() => handleCommandClick(command.id)}
+                      class={`w-full px-4 py-3 flex items-start gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer border-none text-left ${
+                        index() === selectedIndex() ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                      }`}
+                      onMouseEnter={() => setSelectedIndex(index())}
+                    >
+                      <div class="flex-1 min-w-0">
+                        <div class="font-medium text-gray-900 dark:text-gray-100">{command.label}</div>
+                        <div class="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{command.description}</div>
+                      </div>
+                      <Show when={command.shortcut}>
+                        <div class="mt-1">
+                          <Kbd shortcut={buildShortcutString(command.shortcut)} />
+                        </div>
+                      </Show>
+                    </button>
+                  )}
+                </For>
+              </Show>
+            </div>
+          </Dialog.Content>
+        </div>
+      </Dialog.Portal>
+    </Dialog>
+  )
+}
+
+export default CommandPalette
