@@ -60,10 +60,12 @@ body {
 
 .connection-status {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
+  align-items: center;
   padding: 8px 16px;
   background-color: var(--secondary-bg);
   border-bottom: 1px solid var(--border-color);
+  gap: 16px;
 }
 
 .status-indicator {

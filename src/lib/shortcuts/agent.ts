@@ -4,6 +4,7 @@ export function registerAgentShortcuts(
   cycleAgent: () => void,
   cycleAgentReverse: () => void,
   focusModelSelector: () => void,
+  openAgentSelector: () => void,
 ) {
   const isMac = () => navigator.platform.toLowerCase().includes("mac")
 
@@ -39,6 +40,15 @@ export function registerAgentShortcuts(
     modifiers: { ctrl: !isMac(), meta: isMac(), shift: true },
     handler: focusModelSelector,
     description: "focus model",
+    context: "global",
+  })
+
+  keyboardRegistry.register({
+    id: "open-agent-selector",
+    key: "A",
+    modifiers: { ctrl: !isMac(), meta: isMac(), shift: true },
+    handler: openAgentSelector,
+    description: "open agent",
     context: "global",
   })
 }

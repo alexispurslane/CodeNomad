@@ -191,21 +191,142 @@ const App: Component = () => {
 
   function setupCommands() {
     commandRegistry.register({
-      id: "init",
-      label: "Initialize AGENTS.md",
-      description: "Create or update AGENTS.md file",
-      keywords: ["/init", "agents", "initialize"],
+      id: "new-instance",
+      label: "New Instance",
+      description: "Open folder picker to create new instance",
+      category: "Instance",
+      keywords: ["folder", "project", "workspace"],
+      shortcut: { key: "N", meta: true },
+      action: handleSelectFolder,
+    })
+
+    commandRegistry.register({
+      id: "close-instance",
+      label: "Close Instance",
+      description: "Stop current instance's server",
+      category: "Instance",
+      keywords: ["stop", "quit", "close"],
+      shortcut: { key: "W", meta: true },
+      action: async () => {
+        const instance = activeInstance()
+        if (!instance) return
+        await handleCloseInstance(instance.id)
+      },
+    })
+
+    commandRegistry.register({
+      id: "instance-next",
+      label: "Next Instance",
+      description: "Cycle to next instance tab",
+      category: "Instance",
+      keywords: ["switch", "navigate"],
+      shortcut: { key: "]", meta: true },
+      action: () => {
+        const ids = Array.from(instances().keys())
+        if (ids.length <= 1) return
+        const current = ids.indexOf(activeInstanceId() || "")
+        const next = (current + 1) % ids.length
+        if (ids[next]) setActiveInstanceId(ids[next])
+      },
+    })
+
+    commandRegistry.register({
+      id: "instance-prev",
+      label: "Previous Instance",
+      description: "Cycle to previous instance tab",
+      category: "Instance",
+      keywords: ["switch", "navigate"],
+      shortcut: { key: "[", meta: true },
+      action: () => {
+        const ids = Array.from(instances().keys())
+        if (ids.length <= 1) return
+        const current = ids.indexOf(activeInstanceId() || "")
+        const prev = current <= 0 ? ids.length - 1 : current - 1
+        if (ids[prev]) setActiveInstanceId(ids[prev])
+      },
+    })
+
+    commandRegistry.register({
+      id: "new-session",
+      label: "New Session",
+      description: "Create a new parent session",
+      category: "Session",
+      keywords: ["create", "start"],
+      shortcut: { key: "N", meta: true, shift: true },
+      action: async () => {
+        const instance = activeInstance()
+        if (!instance) return
+        await handleNewSession(instance.id)
+      },
+    })
+
+    commandRegistry.register({
+      id: "close-session",
+      label: "Close Session",
+      description: "Close current parent session",
+      category: "Session",
+      keywords: ["close", "stop"],
+      shortcut: { key: "W", meta: true, shift: true },
       action: async () => {
         const instance = activeInstance()
         const sessionId = activeSessionIdForInstance()
-        if (!instance || !instance.client || !sessionId || sessionId === "logs") return
+        if (!instance || !sessionId || sessionId === "logs") return
+        await handleCloseSession(instance.id, sessionId)
+      },
+    })
 
-        try {
-          await instance.client.session.init({ path: { id: sessionId } })
-          console.log("Initialized AGENTS.md")
-        } catch (error) {
-          console.error("Failed to initialize AGENTS.md:", error)
-        }
+    commandRegistry.register({
+      id: "switch-to-logs",
+      label: "Switch to Logs",
+      description: "Jump to logs view for current instance",
+      category: "Session",
+      keywords: ["logs", "console", "output"],
+      shortcut: { key: "L", meta: true, shift: true },
+      action: () => {
+        const instance = activeInstance()
+        if (instance) setActiveSession(instance.id, "logs")
+      },
+    })
+
+    commandRegistry.register({
+      id: "session-next",
+      label: "Next Session",
+      description: "Cycle to next session tab",
+      category: "Session",
+      keywords: ["switch", "navigate"],
+      shortcut: { key: "]", meta: true, shift: true },
+      action: () => {
+        const instanceId = activeInstanceId()
+        if (!instanceId) return
+        const parentId = activeParentSessionId().get(instanceId)
+        if (!parentId) return
+        const familySessions = getSessionFamily(instanceId, parentId)
+        const ids = familySessions.map((s) => s.id).concat(["logs"])
+        if (ids.length <= 1) return
+        const current = ids.indexOf(activeSessionId().get(instanceId) || "")
+        const next = (current + 1) % ids.length
+        if (ids[next]) setActiveSession(instanceId, ids[next])
+      },
+    })
+
+    commandRegistry.register({
+      id: "session-prev",
+      label: "Previous Session",
+      description: "Cycle to previous session tab",
+      category: "Session",
+      keywords: ["switch", "navigate"],
+      shortcut: { key: "[", meta: true, shift: true },
+      action: () => {
+        const instanceId = activeInstanceId()
+        if (!instanceId) return
+        const parentId = activeParentSessionId().get(instanceId)
+        if (!parentId) return
+        const familySessions = getSessionFamily(instanceId, parentId)
+        const ids = familySessions.map((s) => s.id).concat(["logs"])
+        if (ids.length <= 1) return
+        const current = ids.indexOf(activeSessionId().get(instanceId) || "")
+        const prev = current <= 0 ? ids.length - 1 : current - 1
+        if (ids[prev]) setActiveSession(instanceId, ids[prev])
       },
     })
 
@@ -213,6 +334,7 @@ const App: Component = () => {
       id: "compact",
       label: "Compact Session",
       description: "Summarize and compact the current session",
+      category: "Session",
       keywords: ["/compact", "summarize", "compress"],
       action: async () => {
         const instance = activeInstance()
@@ -232,6 +354,7 @@ const App: Component = () => {
       id: "undo",
       label: "Undo Last Message",
       description: "Revert the last message",
+      category: "Session",
       keywords: ["/undo", "revert", "undo"],
       action: async () => {
         const instance = activeInstance()
@@ -248,9 +371,106 @@ const App: Component = () => {
     })
 
     commandRegistry.register({
+      id: "next-agent",
+      label: "Next Agent",
+      description: "Cycle to next agent",
+      category: "Agent & Model",
+      keywords: ["agent", "switch", "cycle"],
+      shortcut: { key: "Tab" },
+      action: handleCycleAgent,
+    })
+
+    commandRegistry.register({
+      id: "prev-agent",
+      label: "Previous Agent",
+      description: "Cycle to previous agent",
+      category: "Agent & Model",
+      keywords: ["agent", "switch", "cycle"],
+      shortcut: { key: "Tab", shift: true },
+      action: handleCycleAgentReverse,
+    })
+
+    commandRegistry.register({
+      id: "open-model-selector",
+      label: "Open Model Selector",
+      description: "Choose a different model",
+      category: "Agent & Model",
+      keywords: ["model", "llm", "ai"],
+      shortcut: { key: "M", meta: true, shift: true },
+      action: () => {
+        const modelControl = document.querySelector("[data-model-selector]") as HTMLElement
+        modelControl?.click()
+        setTimeout(() => {
+          const modelInput = document.querySelector("[data-model-selector] input") as HTMLInputElement
+          modelInput?.focus()
+        }, 100)
+      },
+    })
+
+    commandRegistry.register({
+      id: "open-agent-selector",
+      label: "Open Agent Selector",
+      description: "Choose a different agent",
+      category: "Agent & Model",
+      keywords: ["agent", "mode"],
+      shortcut: { key: "A", meta: true, shift: true },
+      action: () => {
+        const agentTrigger = document.querySelector("[data-agent-selector]") as HTMLElement
+        if (agentTrigger) {
+          agentTrigger.focus()
+          setTimeout(() => {
+            const event = new KeyboardEvent("keydown", {
+              key: "Enter",
+              code: "Enter",
+              keyCode: 13,
+              which: 13,
+              bubbles: true,
+              cancelable: true,
+            })
+            agentTrigger.dispatchEvent(event)
+          }, 50)
+        }
+      },
+    })
+
+    commandRegistry.register({
+      id: "init",
+      label: "Initialize AGENTS.md",
+      description: "Create or update AGENTS.md file",
+      category: "Agent & Model",
+      keywords: ["/init", "agents", "initialize"],
+      action: async () => {
+        const instance = activeInstance()
+        const sessionId = activeSessionIdForInstance()
+        if (!instance || !instance.client || !sessionId || sessionId === "logs") return
+
+        try {
+          await instance.client.session.init({ path: { id: sessionId } })
+          console.log("Initialized AGENTS.md")
+        } catch (error) {
+          console.error("Failed to initialize AGENTS.md:", error)
+        }
+      },
+    })
+
+    commandRegistry.register({
+      id: "clear-input",
+      label: "Clear Input",
+      description: "Clear the prompt textarea",
+      category: "Input & Focus",
+      keywords: ["clear", "reset"],
+      shortcut: { key: "K", meta: true },
+      action: () => {
+        const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
+        if (textarea) textarea.value = ""
+      },
+    })
+
+    commandRegistry.register({
       id: "thinking",
       label: "Toggle Thinking Blocks",
       description: "Show/hide AI thinking process",
+      category: "System",
       keywords: ["/thinking", "toggle", "show", "hide"],
       action: () => {
         console.log("Toggle thinking blocks (not implemented)")
@@ -261,53 +481,10 @@ const App: Component = () => {
       id: "help",
       label: "Show Help",
       description: "Display keyboard shortcuts and help",
+      category: "System",
       keywords: ["/help", "shortcuts", "help"],
       action: () => {
         console.log("Show help modal (not implemented)")
-      },
-    })
-
-    commandRegistry.register({
-      id: "new-session",
-      label: "New Session",
-      description: "Create a new session",
-      shortcut: { key: "N", meta: true, shift: true },
-      action: async () => {
-        const instance = activeInstance()
-        if (!instance) return
-        await handleNewSession(instance.id)
-      },
-    })
-
-    commandRegistry.register({
-      id: "open-model-selector",
-      label: "Open Model Selector",
-      description: "Choose a different model",
-      shortcut: { key: "M", meta: true, shift: true },
-      action: () => {
-        const modelInput = document.querySelector("[data-model-selector] input") as HTMLInputElement
-        modelInput?.focus()
-      },
-    })
-
-    commandRegistry.register({
-      id: "focus-prompt",
-      label: "Focus Prompt Input",
-      description: "Jump to the message input",
-      shortcut: { key: "P", meta: true },
-      action: () => {
-        const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
-        textarea?.focus()
-      },
-    })
-
-    commandRegistry.register({
-      id: "open-agent-selector",
-      label: "Open Agent Selector",
-      description: "Choose a different agent",
-      action: () => {
-        const agentButton = document.querySelector("[data-agent-selector]") as HTMLElement
-        agentButton?.click()
       },
     })
   }
@@ -388,10 +565,31 @@ const App: Component = () => {
         textarea?.focus()
       },
     )
-    registerAgentShortcuts(handleCycleAgent, handleCycleAgentReverse, () => {
-      const modelInput = document.querySelector("[data-model-selector] input") as HTMLInputElement
-      modelInput?.focus()
-    })
+    registerAgentShortcuts(
+      handleCycleAgent,
+      handleCycleAgentReverse,
+      () => {
+        const modelInput = document.querySelector("[data-model-selector] input") as HTMLInputElement
+        modelInput?.focus()
+      },
+      () => {
+        const agentTrigger = document.querySelector("[data-agent-selector]") as HTMLElement
+        if (agentTrigger) {
+          agentTrigger.focus()
+          setTimeout(() => {
+            const event = new KeyboardEvent("keydown", {
+              key: "Enter",
+              code: "Enter",
+              keyCode: 13,
+              which: 13,
+              bubbles: true,
+              cancelable: true,
+            })
+            agentTrigger.dispatchEvent(event)
+          }, 50)
+        }
+      },
+    )
     registerEscapeShortcut(
       () => {
         const instance = activeInstance()
@@ -414,6 +612,16 @@ const App: Component = () => {
     )
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+
+      const isInCombobox = target.closest('[role="combobox"]') !== null
+      const isInListbox = target.closest('[role="listbox"]') !== null
+      const isInSelect = target.closest('[role="button"][data-agent-selector]') !== null
+
+      if (isInCombobox || isInListbox || isInSelect) {
+        return
+      }
+
       const shortcut = keyboardRegistry.findMatch(e)
       if (shortcut) {
         e.preventDefault()

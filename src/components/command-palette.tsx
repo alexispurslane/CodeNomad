@@ -36,8 +36,37 @@ const CommandPalette: Component<CommandPaletteProps> = (props) => {
       const labelMatch = cmd.label.toLowerCase().includes(q)
       const descMatch = cmd.description.toLowerCase().includes(q)
       const keywordMatch = cmd.keywords?.some((k) => k.toLowerCase().includes(q))
-      return labelMatch || descMatch || keywordMatch
+      const categoryMatch = cmd.category?.toLowerCase().includes(q)
+      return labelMatch || descMatch || keywordMatch || categoryMatch
     })
+  }
+
+  const groupedCommands = () => {
+    const filtered = filteredCommands()
+    const groups = new Map<string, Command[]>()
+
+    for (const cmd of filtered) {
+      const category = cmd.category || "Other"
+      if (!groups.has(category)) {
+        groups.set(category, [])
+      }
+      groups.get(category)!.push(cmd)
+    }
+
+    const categoryOrder = ["Instance", "Session", "Agent & Model", "Input & Focus", "System", "Other"]
+    const sorted = new Map<string, Command[]>()
+    for (const cat of categoryOrder) {
+      if (groups.has(cat)) {
+        sorted.set(cat, groups.get(cat)!)
+      }
+    }
+    for (const [cat, cmds] of groups) {
+      if (!sorted.has(cat)) {
+        sorted.set(cat, cmds)
+      }
+    }
+
+    return sorted
   }
 
   createEffect(() => {
@@ -123,27 +152,49 @@ const CommandPalette: Component<CommandPaletteProps> = (props) => {
                 when={filteredCommands().length > 0}
                 fallback={<div class="p-8 text-center text-gray-500">No commands found for "{query()}"</div>}
               >
-                <For each={filteredCommands()}>
-                  {(command, index) => (
-                    <button
-                      type="button"
-                      onClick={() => handleCommandClick(command.id)}
-                      class={`w-full px-4 py-3 flex items-start gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer border-none text-left ${
-                        index() === selectedIndex() ? "bg-blue-50 dark:bg-blue-900/20" : ""
-                      }`}
-                      onMouseEnter={() => setSelectedIndex(index())}
-                    >
-                      <div class="flex-1 min-w-0">
-                        <div class="font-medium text-gray-900 dark:text-gray-100">{command.label}</div>
-                        <div class="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{command.description}</div>
-                      </div>
-                      <Show when={command.shortcut}>
-                        <div class="mt-1">
-                          <Kbd shortcut={buildShortcutString(command.shortcut)} />
+                <For each={Array.from(groupedCommands().entries())}>
+                  {([category, commands]) => {
+                    let globalIndex = 0
+                    for (const [cat, cmds] of groupedCommands().entries()) {
+                      if (cat === category) break
+                      globalIndex += cmds.length
+                    }
+
+                    return (
+                      <div class="py-2">
+                        <div class="px-4 py-2 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                          {category}
                         </div>
-                      </Show>
-                    </button>
-                  )}
+                        <For each={commands}>
+                          {(command, localIndex) => {
+                            const commandIndex = globalIndex + localIndex()
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => handleCommandClick(command.id)}
+                                class={`w-full px-4 py-3 flex items-start gap-3 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors cursor-pointer border-none text-left ${
+                                  commandIndex === selectedIndex() ? "bg-blue-50 dark:bg-blue-900/20" : ""
+                                }`}
+                                onMouseEnter={() => setSelectedIndex(commandIndex)}
+                              >
+                                <div class="flex-1 min-w-0">
+                                  <div class="font-medium text-gray-900 dark:text-gray-100">{command.label}</div>
+                                  <div class="text-sm text-gray-600 dark:text-gray-400 mt-0.5">
+                                    {command.description}
+                                  </div>
+                                </div>
+                                <Show when={command.shortcut}>
+                                  <div class="mt-1">
+                                    <Kbd shortcut={buildShortcutString(command.shortcut)} />
+                                  </div>
+                                </Show>
+                              </button>
+                            )
+                          }}
+                        </For>
+                      </div>
+                    )
+                  }}
                 </For>
               </Show>
             </div>

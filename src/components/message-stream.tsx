@@ -3,6 +3,7 @@ import type { Message } from "../types/message"
 import MessageItem from "./message-item"
 import ToolCall from "./tool-call"
 import { sseManager } from "../lib/sse-manager"
+import Kbd from "./kbd"
 
 interface MessageStreamProps {
   instanceId: string
@@ -86,24 +87,31 @@ export default function MessageStream(props: MessageStreamProps) {
   return (
     <div class="message-stream-container">
       <div class="connection-status">
-        <Show when={connectionStatus() === "connected"}>
-          <span class="status-indicator connected">
-            <span class="status-dot" />
-            Connected
-          </span>
-        </Show>
-        <Show when={connectionStatus() === "connecting"}>
-          <span class="status-indicator connecting">
-            <span class="status-dot" />
-            Connecting...
-          </span>
-        </Show>
-        <Show when={connectionStatus() === "error" || connectionStatus() === "disconnected"}>
-          <span class="status-indicator disconnected">
-            <span class="status-dot" />
-            Disconnected
-          </span>
-        </Show>
+        <div class="flex-1" />
+        <div class="flex items-center gap-2 text-sm font-medium text-gray-700">
+          <span>Command Palette</span>
+          <Kbd shortcut="cmd+shift+p" />
+        </div>
+        <div class="flex-1 flex items-center justify-end gap-3">
+          <Show when={connectionStatus() === "connected"}>
+            <span class="status-indicator connected">
+              <span class="status-dot" />
+              Connected
+            </span>
+          </Show>
+          <Show when={connectionStatus() === "connecting"}>
+            <span class="status-indicator connecting">
+              <span class="status-dot" />
+              Connecting...
+            </span>
+          </Show>
+          <Show when={connectionStatus() === "error" || connectionStatus() === "disconnected"}>
+            <span class="status-indicator disconnected">
+              <span class="status-dot" />
+              Disconnected
+            </span>
+          </Show>
+        </div>
       </div>
       <div ref={containerRef} class="message-stream" onScroll={handleScroll}>
         <Show when={!props.loading && displayItems().length === 0}>

@@ -18,7 +18,6 @@ interface FlatModel extends Model {
 
 export default function ModelSelector(props: ModelSelectorProps) {
   const instanceProviders = () => providers().get(props.instanceId) || []
-  let listboxRef!: HTMLUListElement
   let inputRef!: HTMLInputElement
 
   createEffect(() => {
@@ -69,7 +68,7 @@ export default function ModelSelector(props: ModelSelectorProps) {
         itemComponent={(itemProps) => (
           <Combobox.Item
             item={itemProps.item}
-            class="px-3 py-2 cursor-pointer hover:bg-gray-100 rounded outline-none focus:bg-gray-100 flex items-start gap-2"
+            class="px-3 py-2 cursor-pointer hover:bg-gray-100 data-[highlighted]:bg-blue-100 rounded outline-none flex items-start gap-2"
           >
             <div class="flex flex-col flex-1 min-w-0">
               <Combobox.ItemLabel class="font-medium text-sm text-gray-900">
@@ -106,7 +105,7 @@ export default function ModelSelector(props: ModelSelectorProps) {
 
         <Combobox.Portal>
           <Combobox.Content class="bg-white border border-gray-300 rounded-md shadow-lg max-h-80 overflow-hidden p-1 z-50 min-w-[300px]">
-            <Combobox.Listbox ref={listboxRef} scrollRef={() => listboxRef} class="max-h-80 overflow-auto" />
+            <Combobox.Listbox class="max-h-80 overflow-auto" />
           </Combobox.Content>
         </Combobox.Portal>
       </Combobox>
