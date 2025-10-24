@@ -100,8 +100,21 @@ const FilePicker: Component<FilePickerProps> = (props) => {
             isGitFile: false,
           }))
       } else {
-        console.log(`[FilePicker] Empty query, showing only git files`)
-        searchFiles = []
+        console.log(`[FilePicker] Empty query, fetching all files with wildcard`)
+        const searchResponse = await props.instanceClient.find.files({
+          query: { query: "." },
+        })
+        const elapsed = Date.now() - startTime
+
+        console.log(`[FilePicker] All files response received in ${elapsed}ms:`, searchResponse)
+
+        searchFiles = (searchResponse?.data || [])
+          .filter((path: string) => !path.endsWith("/"))
+          .filter((path: string) => !gitFiles.some((gf) => gf.path === path))
+          .map((path: string) => ({
+            path,
+            isGitFile: false,
+          }))
       }
 
       const filteredGitFiles = searchQuery.trim()
