@@ -35,6 +35,7 @@ export default function PromptInput(props: PromptInputProps) {
   const [isDragging, setIsDragging] = createSignal(false)
   const [ignoredAtPositions, setIgnoredAtPositions] = createSignal<Set<number>>(new Set())
   const [pasteCount, setPasteCount] = createSignal(0)
+  const [imageCount, setImageCount] = createSignal(0)
   let textareaRef: HTMLTextAreaElement | undefined
   let containerRef: HTMLDivElement | undefined
 
@@ -74,7 +75,44 @@ export default function PromptInput(props: PromptInputProps) {
     }
   }
 
-  function handlePaste(e: ClipboardEvent) {
+  async function handlePaste(e: ClipboardEvent) {
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+
+      if (item.type.startsWith("image/")) {
+        e.preventDefault()
+
+        const blob = item.getAsFile()
+        if (!blob) continue
+
+        const count = imageCount() + 1
+        setImageCount(count)
+
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64Data = (reader.result as string).split(",")[1]
+          const display = `[Image #${count}]`
+          const filename = `image-${count}.png`
+
+          const attachment = createFileAttachment(
+            filename,
+            filename,
+            "image/png",
+            new TextEncoder().encode(base64Data),
+            props.instanceFolder,
+          )
+          attachment.url = `data:image/png;base64,${base64Data}`
+          addAttachment(props.instanceId, props.sessionId, attachment)
+        }
+        reader.readAsDataURL(blob)
+
+        return
+      }
+    }
+
     const pastedText = e.clipboardData?.getData("text/plain")
     if (!pastedText) return
 
@@ -307,6 +345,7 @@ export default function PromptInput(props: PromptInputProps) {
       clearAttachments(props.instanceId, props.sessionId)
       setIgnoredAtPositions(new Set<number>())
       setPasteCount(0)
+      setImageCount(0)
 
       if (textareaRef) {
         textareaRef.style.height = "auto"
@@ -537,61 +576,71 @@ export default function PromptInput(props: PromptInputProps) {
           <Show when={attachments().length > 0}>
             <div class="flex flex-wrap gap-1.5 border-b border-gray-200 pb-2 dark:border-gray-700">
               <For each={attachments()}>
-                {(attachment) => (
-                  <div class="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20">
-                    <Show
-                      when={attachment.source.type === "text"}
-                      fallback={
-                        <Show
-                          when={attachment.source.type === "agent"}
-                          fallback={
+                {(attachment) => {
+                  const isImage = attachment.mediaType.startsWith("image/")
+                  return (
+                    <div class="inline-flex items-center gap-1.5 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10 dark:bg-blue-500/10 dark:text-blue-400 dark:ring-blue-500/20">
+                      <Show
+                        when={isImage}
+                        fallback={
+                          <Show
+                            when={attachment.source.type === "text"}
+                            fallback={
+                              <Show
+                                when={attachment.source.type === "agent"}
+                                fallback={
+                                  <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path
+                                      stroke-linecap="round"
+                                      stroke-linejoin="round"
+                                      stroke-width="2"
+                                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                    />
+                                  </svg>
+                                }
+                              >
+                                <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path
+                                    stroke-linecap="round"
+                                    stroke-linejoin="round"
+                                    stroke-width="2"
+                                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                                  />
+                                </svg>
+                              </Show>
+                            }
+                          >
                             <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path
                                 stroke-linecap="round"
                                 stroke-linejoin="round"
                                 stroke-width="2"
-                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
                               />
                             </svg>
-                          }
-                        >
-                          <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                              stroke-width="2"
-                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                            />
-                          </svg>
-                        </Show>
-                      }
-                    >
-                      <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                        />
-                      </svg>
-                    </Show>
-                    <span>{attachment.source.type === "text" ? attachment.display : attachment.filename}</span>
-                    <button
-                      onClick={() => handleRemoveAttachment(attachment.id)}
-                      class="ml-0.5 flex h-4 w-4 items-center justify-center rounded hover:bg-blue-100 dark:hover:bg-blue-500/20"
-                      aria-label="Remove attachment"
-                    >
-                      <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path
-                          stroke-linecap="round"
-                          stroke-linejoin="round"
-                          stroke-width="2"
-                          d="M6 18L18 6M6 6l12 12"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                )}
+                          </Show>
+                        }
+                      >
+                        <img src={attachment.url} alt={attachment.filename} class="h-5 w-5 rounded object-cover" />
+                      </Show>
+                      <span>{attachment.source.type === "text" ? attachment.display : attachment.filename}</span>
+                      <button
+                        onClick={() => handleRemoveAttachment(attachment.id)}
+                        class="ml-0.5 flex h-4 w-4 items-center justify-center rounded hover:bg-blue-100 dark:hover:bg-blue-500/20"
+                        aria-label="Remove attachment"
+                      >
+                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12"
+                          />
+                        </svg>
+                      </button>
+                    </div>
+                  )
+                }}
               </For>
             </div>
           </Show>
