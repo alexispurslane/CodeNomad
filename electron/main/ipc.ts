@@ -35,13 +35,13 @@ export function setupInstanceIPC(mainWindow: BrowserWindow) {
     instances.set(id, instance)
 
     try {
-      const { pid, port } = await processManager.spawn(folder, id)
+      const { pid, port, binaryPath } = await processManager.spawn(folder, id)
 
       instance.port = port
       instance.pid = pid
       instance.status = "ready"
 
-      mainWindow.webContents.send("instance:started", { id, port, pid })
+      mainWindow.webContents.send("instance:started", { id, port, pid, binaryPath })
 
       const meta = processManager.getAllProcesses().get(pid)
       if (meta) {
@@ -51,7 +51,7 @@ export function setupInstanceIPC(mainWindow: BrowserWindow) {
         })
       }
 
-      return { id, port, pid }
+      return { id, port, pid, binaryPath }
     } catch (error) {
       instance.status = "error"
       instance.error = error instanceof Error ? error.message : String(error)

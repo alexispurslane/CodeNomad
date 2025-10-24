@@ -6,6 +6,27 @@ export interface LogEntry {
   message: string
 }
 
+export interface ProjectInfo {
+  id: string
+  worktree: string
+  vcs?: "git"
+  time: {
+    created: number
+    initialized?: number
+  }
+}
+
+export interface McpServerStatus {
+  name: string
+  status: "running" | "stopped" | "error"
+}
+
+export interface InstanceMetadata {
+  project?: ProjectInfo
+  mcpStatus?: unknown
+  version?: string
+}
+
 export interface Instance {
   id: string
   folder: string
@@ -15,4 +36,6 @@ export interface Instance {
   error?: string
   client: OpencodeClient | null
   logs: LogEntry[]
+  metadata?: InstanceMetadata
+  binaryPath?: string
 }

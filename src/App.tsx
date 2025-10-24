@@ -2,7 +2,7 @@ import { Component, onMount, onCleanup, Show, createMemo, createEffect } from "s
 import type { Session } from "./types/session"
 import type { Attachment } from "./types/attachment"
 import EmptyState from "./components/empty-state"
-import SessionPicker from "./components/session-picker"
+import InstanceWelcomeView from "./components/instance-welcome-view"
 import CommandPalette from "./components/command-palette"
 import InstanceTabs from "./components/instance-tabs"
 import SessionTabs from "./components/session-tabs"
@@ -12,15 +12,7 @@ import LogsView from "./components/logs-view"
 import { initMarkdown } from "./lib/markdown"
 import { createCommandRegistry } from "./lib/commands"
 import type { Command } from "./lib/commands"
-import {
-  hasInstances,
-  isSelectingFolder,
-  setIsSelectingFolder,
-  setHasInstances,
-  sessionPickerInstance,
-  hideSessionPicker,
-  showSessionPicker,
-} from "./stores/ui"
+import { hasInstances, isSelectingFolder, setIsSelectingFolder, setHasInstances } from "./stores/ui"
 import {
   createInstance,
   instances,
@@ -187,7 +179,6 @@ const App: Component = () => {
     }
 
     clearActiveParentSession(instanceId)
-    showSessionPicker(instanceId)
   }
 
   function setupCommands() {
@@ -592,9 +583,9 @@ const App: Component = () => {
       handleSelectFolder()
     })
 
-    window.electronAPI.onInstanceStarted(({ id, port, pid }) => {
-      console.log("Instance started:", { id, port, pid })
-      updateInstance(id, { port, pid, status: "ready" })
+    window.electronAPI.onInstanceStarted(({ id, port, pid, binaryPath }) => {
+      console.log("Instance started:", { id, port, pid, binaryPath })
+      updateInstance(id, { port, pid, status: "ready", binaryPath })
     })
 
     window.electronAPI.onInstanceError(({ id, error }) => {
@@ -629,17 +620,7 @@ const App: Component = () => {
             <Show when={activeInstance()}>
               {(instance) => (
                 <>
-                  <Show
-                    when={activeSessions().size > 0}
-                    fallback={
-                      <div class="flex-1 flex items-center justify-center">
-                        <div class="text-center text-gray-500">
-                          <p class="mb-2">No parent session selected</p>
-                          <p class="text-sm">Select or create a parent session to begin</p>
-                        </div>
-                      </div>
-                    }
-                  >
+                  <Show when={activeSessions().size > 0} fallback={<InstanceWelcomeView instance={instance()} />}>
                     <SessionTabs
                       instanceId={instance().id}
                       sessions={activeSessions()}
@@ -684,10 +665,6 @@ const App: Component = () => {
         }
       >
         <EmptyState onSelectFolder={handleSelectFolder} isLoading={isSelectingFolder()} />
-      </Show>
-
-      <Show when={sessionPickerInstance()}>
-        {(instanceId) => <SessionPicker instanceId={instanceId()} open={true} onClose={hideSessionPicker} />}
       </Show>
 
       <CommandPalette

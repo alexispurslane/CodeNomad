@@ -2,9 +2,9 @@ import { contextBridge, ipcRenderer } from "electron"
 
 export interface ElectronAPI {
   selectFolder: () => Promise<string | null>
-  createInstance: (id: string, folder: string) => Promise<{ id: string; port: number; pid: number }>
+  createInstance: (id: string, folder: string) => Promise<{ id: string; port: number; pid: number; binaryPath: string }>
   stopInstance: (pid: number) => Promise<void>
-  onInstanceStarted: (callback: (data: { id: string; port: number; pid: number }) => void) => void
+  onInstanceStarted: (callback: (data: { id: string; port: number; pid: number; binaryPath: string }) => void) => void
   onInstanceError: (callback: (data: { id: string; error: string }) => void) => void
   onInstanceStopped: (callback: (data: { id: string }) => void) => void
   onInstanceLog: (

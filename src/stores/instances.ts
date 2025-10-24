@@ -3,7 +3,6 @@ import type { Instance, LogEntry } from "../types/instance"
 import { sdkManager } from "../lib/sdk-manager"
 import { sseManager } from "../lib/sse-manager"
 import { fetchSessions, fetchAgents, fetchProviders } from "./sessions"
-import { showSessionPicker } from "./ui"
 
 const [instances, setInstances] = createSignal<Map<string, Instance>>(new Map())
 const [activeInstanceId, setActiveInstanceId] = createSignal<string | null>(null)
@@ -57,7 +56,7 @@ async function createInstance(folder: string): Promise<string> {
   addInstance(instance)
 
   try {
-    const { id: returnedId, port, pid } = await window.electronAPI.createInstance(id, folder)
+    const { id: returnedId, port, pid, binaryPath } = await window.electronAPI.createInstance(id, folder)
 
     const client = sdkManager.createClient(port)
 
@@ -66,6 +65,7 @@ async function createInstance(folder: string): Promise<string> {
       pid,
       client,
       status: "ready",
+      binaryPath,
     })
 
     setActiveInstanceId(id)
@@ -78,8 +78,6 @@ async function createInstance(folder: string): Promise<string> {
     } catch (error) {
       console.error("Failed to fetch initial data:", error)
     }
-
-    showSessionPicker(id)
 
     return id
   } catch (error) {

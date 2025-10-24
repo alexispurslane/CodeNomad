@@ -6,6 +6,7 @@ import { execSync } from "child_process"
 export interface ProcessInfo {
   pid: number
   port: number
+  binaryPath: string
 }
 
 interface ProcessMeta {
@@ -51,7 +52,7 @@ class ProcessManager {
 
   async spawn(folder: string, instanceId: string): Promise<ProcessInfo> {
     this.validateFolder(folder)
-    this.validateOpenCodeBinary()
+    const binaryPath = this.validateOpenCodeBinary()
 
     this.sendLog(instanceId, "info", `Starting OpenCode server for ${folder}...`)
 
@@ -102,7 +103,7 @@ class ProcessManager {
             }
 
             this.processes.set(child.pid!, meta)
-            resolve({ pid: child.pid!, port })
+            resolve({ pid: child.pid!, port, binaryPath })
           }
 
           const meta = this.processes.get(child.pid!)
@@ -208,10 +209,12 @@ class ProcessManager {
     }
   }
 
-  private validateOpenCodeBinary(): void {
+  private validateOpenCodeBinary(): string {
     const command = process.platform === "win32" ? "where opencode" : "which opencode"
     try {
-      execSync(command, { stdio: "pipe" })
+      const output = execSync(command, { stdio: "pipe", encoding: "utf-8" })
+      const paths = output.trim().split("\n")
+      return paths[0].trim()
     } catch {
       throw new Error(
         "opencode binary not found in PATH. Please install OpenCode CLI first: npm install -g @opencode/cli",
