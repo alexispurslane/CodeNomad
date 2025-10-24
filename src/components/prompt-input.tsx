@@ -711,7 +711,7 @@ export default function PromptInput(props: PromptInputProps) {
           <textarea
             ref={textareaRef}
             class="prompt-input"
-            placeholder="Type your message, @file, @agent, or /command..."
+            placeholder="Type your message, @file, @agent, or paste images and text..."
             value={prompt()}
             onInput={handleInput}
             onKeyDown={handleKeyDown}
