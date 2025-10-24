@@ -1,4 +1,4 @@
-import { createSignal, Show, onMount, For } from "solid-js"
+import { createSignal, Show, onMount, For, onCleanup } from "solid-js"
 import AgentSelector from "./agent-selector"
 import ModelSelector from "./model-selector"
 import FilePicker from "./file-picker"
@@ -114,6 +114,40 @@ export default function PromptInput(props: PromptInputProps) {
   onMount(async () => {
     const loaded = await getHistory(props.instanceFolder)
     setHistory(loaded)
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const activeElement = document.activeElement as HTMLElement
+
+      const isInputElement =
+        activeElement?.tagName === "INPUT" ||
+        activeElement?.tagName === "TEXTAREA" ||
+        activeElement?.tagName === "SELECT" ||
+        activeElement?.isContentEditable
+
+      if (isInputElement) return
+
+      const isModifierKey = e.ctrlKey || e.metaKey || e.altKey
+      if (isModifierKey) return
+
+      const isSpecialKey =
+        e.key === "Escape" ||
+        e.key === "Tab" ||
+        e.key === "Enter" ||
+        e.key.startsWith("Arrow") ||
+        e.key === "Backspace" ||
+        e.key === "Delete"
+      if (isSpecialKey) return
+
+      if (e.key.length === 1 && textareaRef && !props.disabled) {
+        textareaRef.focus()
+      }
+    }
+
+    document.addEventListener("keydown", handleGlobalKeyDown)
+
+    onCleanup(() => {
+      document.removeEventListener("keydown", handleGlobalKeyDown)
+    })
   })
 
   function handleKeyDown(e: KeyboardEvent) {
