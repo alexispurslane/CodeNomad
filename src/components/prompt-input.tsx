@@ -40,14 +40,26 @@ export default function PromptInput(props: PromptInputProps) {
   const attachments = () => getAttachments(props.instanceId, props.sessionId)
 
   function handleRemoveAttachment(attachmentId: string) {
-    removeAttachment(props.instanceId, props.sessionId, attachmentId)
-
     const currentAttachments = attachments()
     const attachment = currentAttachments.find((a) => a.id === attachmentId)
-    if (attachment && attachment.source.type === "file") {
-      const filename = attachment.filename
+
+    removeAttachment(props.instanceId, props.sessionId, attachmentId)
+
+    if (attachment) {
       const currentPrompt = prompt()
-      const newPrompt = currentPrompt.replace(`@${filename}`, "").replace(/\s+/g, " ").trim()
+      let newPrompt = currentPrompt
+
+      if (attachment.source.type === "file") {
+        const filename = attachment.filename
+        newPrompt = currentPrompt.replace(`@${filename}`, "").replace(/\s+/g, " ").trim()
+      } else if (attachment.source.type === "text") {
+        const placeholderMatch = attachment.display.match(/pasted #(\d+)/)
+        if (placeholderMatch) {
+          const placeholder = `[pasted #${placeholderMatch[1]}]`
+          newPrompt = currentPrompt.replace(placeholder, "").replace(/\s+/g, " ").trim()
+        }
+      }
+
       setPrompt(newPrompt)
 
       if (textareaRef) {
@@ -78,6 +90,24 @@ export default function PromptInput(props: PromptInputProps) {
 
       const attachment = createTextAttachment(pastedText, display, filename)
       addAttachment(props.instanceId, props.sessionId, attachment)
+
+      const textarea = textareaRef
+      if (textarea) {
+        const start = textarea.selectionStart
+        const end = textarea.selectionEnd
+        const currentText = prompt()
+        const placeholder = `[pasted #${count}]`
+        const newText = currentText.substring(0, start) + placeholder + currentText.substring(end)
+        setPrompt(newText)
+
+        setTimeout(() => {
+          const newCursorPos = start + placeholder.length
+          textarea.setSelectionRange(newCursorPos, newCursorPos)
+          textarea.style.height = "auto"
+          textarea.style.height = Math.min(textarea.scrollHeight, 200) + "px"
+          textarea.focus()
+        }, 0)
+      }
     }
   }
 
