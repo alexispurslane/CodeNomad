@@ -93,3 +93,18 @@ export function createTextAttachment(value: string, display: string, filename: s
     },
   }
 }
+
+export function createAgentAttachment(agentName: string): Attachment {
+  return {
+    id: crypto.randomUUID(),
+    type: "agent",
+    display: `@${agentName}`,
+    url: "",
+    filename: agentName,
+    mediaType: "text/plain",
+    source: {
+      type: "agent",
+      name: agentName,
+    },
+  }
+}

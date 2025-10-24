@@ -2,13 +2,15 @@ import { createSignal, Show, onMount, For, onCleanup } from "solid-js"
 import AgentSelector from "./agent-selector"
 import ModelSelector from "./model-selector"
 import FilePicker from "./file-picker"
+import AgentPicker from "./agent-picker"
 import { addToHistory, getHistory } from "../stores/message-history"
 import { getAttachments, addAttachment, clearAttachments, removeAttachment } from "../stores/attachments"
-import { createFileAttachment, createTextAttachment } from "../types/attachment"
+import { createFileAttachment, createTextAttachment, createAgentAttachment } from "../types/attachment"
 import type { Attachment } from "../types/attachment"
 import Kbd from "./kbd"
 import HintRow from "./hint-row"
 import { getActiveInstance } from "../stores/instances"
+import { agents } from "../stores/sessions"
 
 interface PromptInputProps {
   instanceId: string
@@ -29,7 +31,9 @@ export default function PromptInput(props: PromptInputProps) {
   const [historyIndex, setHistoryIndex] = createSignal(-1)
   const [isFocused, setIsFocused] = createSignal(false)
   const [showFilePicker, setShowFilePicker] = createSignal(false)
+  const [showAgentPicker, setShowAgentPicker] = createSignal(false)
   const [fileSearchQuery, setFileSearchQuery] = createSignal("")
+  const [agentSearchQuery, setAgentSearchQuery] = createSignal("")
   const [atPosition, setAtPosition] = createSignal<number | null>(null)
   const [isDragging, setIsDragging] = createSignal(false)
   const [ignoredAtPositions, setIgnoredAtPositions] = createSignal<Set<number>>(new Set())
@@ -38,6 +42,7 @@ export default function PromptInput(props: PromptInputProps) {
   let containerRef: HTMLDivElement | undefined
 
   const attachments = () => getAttachments(props.instanceId, props.sessionId)
+  const instanceAgents = () => agents().get(props.instanceId) || []
 
   function handleRemoveAttachment(attachmentId: string) {
     const currentAttachments = attachments()
@@ -52,6 +57,9 @@ export default function PromptInput(props: PromptInputProps) {
       if (attachment.source.type === "file") {
         const filename = attachment.filename
         newPrompt = currentPrompt.replace(`@${filename}`, "").replace(/\s+/g, " ").trim()
+      } else if (attachment.source.type === "agent") {
+        const agentName = attachment.filename
+        newPrompt = currentPrompt.replace(`@${agentName}`, "").replace(/\s+/g, " ").trim()
       } else if (attachment.source.type === "text") {
         const placeholderMatch = attachment.display.match(/pasted #(\d+)/)
         if (placeholderMatch) {
@@ -198,13 +206,13 @@ export default function PromptInput(props: PromptInputProps) {
         }
       }
 
-      const fileMentionRegex = /@(\S+)/g
-      let fileMatch
+      const mentionRegex = /@(\S+)/g
+      let mentionMatch
 
-      while ((fileMatch = fileMentionRegex.exec(text)) !== null) {
-        const mentionStart = fileMatch.index
-        const mentionEnd = fileMatch.index + fileMatch[0].length
-        const filename = fileMatch[1]
+      while ((mentionMatch = mentionRegex.exec(text)) !== null) {
+        const mentionStart = mentionMatch.index
+        const mentionEnd = mentionMatch.index + mentionMatch[0].length
+        const name = mentionMatch[1]
 
         const isDeletingFromEnd = e.key === "Backspace" && cursorPos === mentionEnd
         const isDeletingFromStart = e.key === "Delete" && cursorPos === mentionStart
@@ -215,7 +223,9 @@ export default function PromptInput(props: PromptInputProps) {
 
         if (isDeletingFromEnd || isDeletingFromStart || isSelected) {
           const currentAttachments = attachments()
-          const attachment = currentAttachments.find((a) => a.source.type === "file" && a.filename === filename)
+          const attachment = currentAttachments.find(
+            (a) => (a.source.type === "file" || a.source.type === "agent") && a.filename === name,
+          )
 
           if (attachment) {
             e.preventDefault()
@@ -243,7 +253,7 @@ export default function PromptInput(props: PromptInputProps) {
       }
     }
 
-    if (e.key === "Enter" && !e.shiftKey && !showFilePicker()) {
+    if (e.key === "Enter" && !e.shiftKey && !showFilePicker() && !showAgentPicker()) {
       e.preventDefault()
       handleSend()
       return
@@ -252,7 +262,7 @@ export default function PromptInput(props: PromptInputProps) {
     const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0
     const currentHistory = history()
 
-    if (e.key === "ArrowUp" && !showFilePicker() && atStart && currentHistory.length > 0) {
+    if (e.key === "ArrowUp" && !showFilePicker() && !showAgentPicker() && atStart && currentHistory.length > 0) {
       e.preventDefault()
       const newIndex = historyIndex() === -1 ? 0 : Math.min(historyIndex() + 1, currentHistory.length - 1)
       setHistoryIndex(newIndex)
@@ -264,7 +274,7 @@ export default function PromptInput(props: PromptInputProps) {
       return
     }
 
-    if (e.key === "ArrowDown" && !showFilePicker() && historyIndex() >= 0) {
+    if (e.key === "ArrowDown" && !showFilePicker() && !showAgentPicker() && historyIndex() >= 0) {
       e.preventDefault()
       const newIndex = historyIndex() - 1
       if (newIndex >= 0) {
@@ -345,14 +355,28 @@ export default function PromptInput(props: PromptInputProps) {
       if (!hasSpace && cursorPos === lastAtIndex + textAfterAt.length + 1) {
         if (!ignoredAtPositions().has(lastAtIndex)) {
           setAtPosition(lastAtIndex)
-          setFileSearchQuery(textAfterAt)
-          setShowFilePicker(true)
+
+          const availableAgents = instanceAgents()
+          const matchesAgent = availableAgents.some((agent) =>
+            agent.name.toLowerCase().includes(textAfterAt.toLowerCase()),
+          )
+
+          if (matchesAgent && textAfterAt.length > 0) {
+            setAgentSearchQuery(textAfterAt)
+            setShowAgentPicker(true)
+            setShowFilePicker(false)
+          } else {
+            setFileSearchQuery(textAfterAt)
+            setShowFilePicker(true)
+            setShowAgentPicker(false)
+          }
         }
         return
       }
     }
 
     setShowFilePicker(false)
+    setShowAgentPicker(false)
     setAtPosition(null)
   }
 
@@ -435,6 +459,56 @@ export default function PromptInput(props: PromptInputProps) {
 
   function handleFilePickerNavigate(_direction: "up" | "down") {}
 
+  function handleAgentSelect(agentName: string) {
+    const existingAttachments = attachments()
+    const alreadyAttached = existingAttachments.some(
+      (att) => att.source.type === "agent" && att.source.name === agentName,
+    )
+
+    if (!alreadyAttached) {
+      const attachment = createAgentAttachment(agentName)
+      addAttachment(props.instanceId, props.sessionId, attachment)
+    }
+
+    const currentPrompt = prompt()
+    const pos = atPosition()
+    const cursorPos = textareaRef?.selectionStart || 0
+
+    if (pos !== null) {
+      const before = currentPrompt.substring(0, pos)
+      const after = currentPrompt.substring(cursorPos)
+      const attachmentText = `@${agentName}`
+      const newPrompt = before + attachmentText + " " + after
+      setPrompt(newPrompt)
+
+      setTimeout(() => {
+        if (textareaRef) {
+          const newCursorPos = pos + attachmentText.length + 1
+          textareaRef.setSelectionRange(newCursorPos, newCursorPos)
+          textareaRef.style.height = "auto"
+          textareaRef.style.height = Math.min(textareaRef.scrollHeight, 200) + "px"
+        }
+      }, 0)
+    }
+
+    setShowAgentPicker(false)
+    setAtPosition(null)
+    setAgentSearchQuery("")
+
+    textareaRef?.focus()
+  }
+
+  function handleAgentPickerClose() {
+    const pos = atPosition()
+    if (pos !== null) {
+      setIgnoredAtPositions((prev) => new Set(prev).add(pos))
+    }
+    setShowAgentPicker(false)
+    setAtPosition(null)
+    setAgentSearchQuery("")
+    setTimeout(() => textareaRef?.focus(), 0)
+  }
+
   function handleDragOver(e: DragEvent) {
     e.preventDefault()
     e.stopPropagation()
@@ -494,6 +568,17 @@ export default function PromptInput(props: PromptInputProps) {
           />
         </Show>
 
+        <Show when={showAgentPicker()}>
+          <AgentPicker
+            open={showAgentPicker()}
+            onClose={handleAgentPickerClose}
+            onSelect={handleAgentSelect}
+            agents={instanceAgents()}
+            searchQuery={agentSearchQuery()}
+            textareaRef={textareaRef}
+          />
+        </Show>
+
         <div class="flex flex-1 flex-col">
           <Show when={attachments().length > 0}>
             <div class="flex flex-wrap gap-1.5 border-b border-gray-200 pb-2 dark:border-gray-700">
@@ -503,14 +588,28 @@ export default function PromptInput(props: PromptInputProps) {
                     <Show
                       when={attachment.source.type === "text"}
                       fallback={
-                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                            stroke-width="2"
-                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                          />
-                        </svg>
+                        <Show
+                          when={attachment.source.type === "agent"}
+                          fallback={
+                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                                stroke-width="2"
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
+                            </svg>
+                          }
+                        >
+                          <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              stroke-width="2"
+                              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                            />
+                          </svg>
+                        </Show>
                       }
                     >
                       <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -545,7 +644,7 @@ export default function PromptInput(props: PromptInputProps) {
           <textarea
             ref={textareaRef}
             class="prompt-input"
-            placeholder="Type your message, @file, or /command..."
+            placeholder="Type your message, @file, @agent, or /command..."
             value={prompt()}
             onInput={handleInput}
             onKeyDown={handleKeyDown}
@@ -566,8 +665,8 @@ export default function PromptInput(props: PromptInputProps) {
       </div>
       <div class="prompt-input-hints">
         <HintRow>
-          <Kbd>Enter</Kbd> to send • <Kbd>Shift+Enter</Kbd> for new line • <Kbd>@</Kbd> for files • <Kbd>↑↓</Kbd> for
-          history
+          <Kbd>Enter</Kbd> to send • <Kbd>Shift+Enter</Kbd> for new line • <Kbd>@</Kbd> for files/agents • <Kbd>↑↓</Kbd>{" "}
+          for history
           <Show when={attachments().length > 0}>
             <span class="ml-2 text-xs text-gray-500">• {attachments().length} file(s) attached</span>
           </Show>
