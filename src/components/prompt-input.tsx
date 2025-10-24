@@ -113,6 +113,7 @@ export default function PromptInput(props: PromptInputProps) {
             props.instanceFolder,
           )
           attachment.url = `data:image/png;base64,${base64Data}`
+          attachment.display = display
           addAttachment(props.instanceId, props.sessionId, attachment)
 
           const textarea = textareaRef
