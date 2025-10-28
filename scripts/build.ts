@@ -4,6 +4,9 @@ import { $ } from "bun"
 import { existsSync } from "fs"
 import { join } from "path"
 
+const appDir = join(import.meta.dir, "..")
+$.cwd(appDir)
+
 const platforms = {
   mac: {
     args: ["--mac", "--x64", "--arm64", "--universal"],
@@ -58,7 +61,7 @@ async function build(platform: string) {
     await $`bun run build`
 
     console.log("\n📦 Step 2/2: Packaging binaries...\n")
-    const distExists = existsSync(join(process.cwd(), "dist"))
+    const distExists = existsSync(join(appDir, "dist"))
     if (!distExists) {
       throw new Error("dist/ directory not found. Build failed.")
     }
