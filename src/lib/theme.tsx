@@ -19,20 +19,34 @@ function applyTheme(dark: boolean) {
 }
 
 export function ThemeProvider(props: { children: JSX.Element }) {
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches
-  const [isDark, setIsDarkSignal] = createSignal(prefersDark)
+  const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)")
+  const [isDark, setIsDarkSignal] = createSignal(systemPrefersDark.matches)
 
-  applyTheme(prefersDark)
+  applyTheme(systemPrefersDark.matches)
 
   async function loadTheme() {
     try {
       const config = await storage.loadConfig()
-      const savedTheme = (config as any).theme
-      const initialDark = savedTheme ? savedTheme === "dark" : prefersDark
-      setIsDarkSignal(initialDark)
-      applyTheme(initialDark)
+      const savedTheme = (config as any)?.theme
+      let themeDark: boolean
+
+      if (savedTheme === "system") {
+        themeDark = systemPrefersDark.matches
+      } else if (savedTheme === "dark") {
+        themeDark = true
+      } else if (savedTheme === "light") {
+        themeDark = false
+      } else {
+        themeDark = systemPrefersDark.matches
+      }
+
+      setIsDarkSignal(themeDark)
+      applyTheme(themeDark)
     } catch (error) {
       console.warn("Failed to load theme from config:", error)
+      const themeDark = systemPrefersDark.matches
+      setIsDarkSignal(themeDark)
+      applyTheme(themeDark)
     }
   }
 
@@ -53,7 +67,22 @@ export function ThemeProvider(props: { children: JSX.Element }) {
       loadTheme()
     })
 
-    return unsubscribe
+    // Listen for system theme changes
+    const handleSystemThemeChange = (e: MediaQueryListEvent) => {
+      const config = (window as any).currentConfig
+      const savedTheme = config?.theme
+      if (!savedTheme || savedTheme === "system") {
+        setIsDarkSignal(e.matches)
+        applyTheme(e.matches)
+      }
+    }
+
+    systemPrefersDark.addEventListener("change", handleSystemThemeChange)
+
+    return () => {
+      unsubscribe()
+      systemPrefersDark.removeEventListener("change", handleSystemThemeChange)
+    }
   })
 
   createEffect(() => {

@@ -224,7 +224,7 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
                         </button>
                         <button
                           onClick={(e) => handleRemove(folder.path, e)}
-                          class="opacity-0 group-hover:opacity-100 p-2.5 transition-all mr-2 hover:bg-red-100 dark:hover:bg-red-900/30"
+                          class="p-2.5 transition-all mr-2 hover:bg-red-100 dark:hover:bg-red-900/30 opacity-70 hover:opacity-100"
                           title="Remove from recent"
                         >
                           <Trash2 class="w-3.5 h-3.5 transition-colors icon-muted hover:text-red-600 dark:hover:text-red-400" />
@@ -243,20 +243,29 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
               <p class="panel-subtitle">Select any folder on your computer</p>
             </div>
 
-            <div class="panel-body">
+            <div class="panel-body space-y-3">
               <button
                 onClick={handleBrowse}
                 disabled={props.isLoading}
-                class={`w-full px-4 py-2.5 rounded-lg transition-all font-medium flex items-center justify-between text-sm disabled:cursor-not-allowed ${props.isLoading ? "selector-button-secondary disabled" : "selector-button-primary"}`}
+                class="button-primary w-full flex items-center justify-between text-sm disabled:cursor-not-allowed"
                 onMouseEnter={() => setFocusMode("new")}
               >
-                <div class="flex items-center gap-2 flex-1 justify-center">
+                <div class="flex items-center gap-2">
                   <FolderPlus class="w-4 h-4" />
                   <span>{props.isLoading ? "Opening..." : "Browse Folders"}</span>
                 </div>
                 <kbd class="kbd">
                   Cmd+Enter
                 </kbd>
+              </button>
+
+              <button
+                onClick={handleBrowse}
+                disabled={props.isLoading}
+                class="button-secondary w-full flex items-center justify-center gap-2 text-sm disabled:cursor-not-allowed"
+              >
+                <FolderPlus class="w-4 h-4" />
+                <span>Create New Session</span>
               </button>
             </div>
 
@@ -267,20 +276,20 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
                 class="panel-section-header"
               >
                 <div class="flex items-center gap-2">
-                  <Settings class="w-4 h-4" style="color: var(--text-muted)" />
-                  <span class="text-sm font-medium" style="color: var(--text-secondary)">Advanced Settings</span>
+                  <Settings class="w-4 h-4 icon-muted" />
+                  <span class="text-sm font-medium text-secondary">Advanced Settings</span>
                 </div>
                 {showAdvanced() ? (
-                  <ChevronUp class="w-4 h-4" style="color: var(--text-muted)" />
+                  <ChevronUp class="w-4 h-4 icon-muted" />
                 ) : (
-                  <ChevronDown class="w-4 h-4" style="color: var(--text-muted)" />
+                  <ChevronDown class="w-4 h-4 icon-muted" />
                 )}
               </button>
 
               <Show when={showAdvanced()}>
-                <div class="panel-section-content">
-                  <div>
-                    <div class="text-sm font-medium mb-2" style="color: var(--text-secondary)">OpenCode Binary</div>
+                <div class="panel-section-content w-full">
+                  <div class="w-full">
+                    <div class="text-sm font-medium mb-2 text-secondary">OpenCode Binary</div>
                     <OpenCodeBinarySelector
                       selectedBinary={selectedBinary()}
                       onBinaryChange={handleBinaryChange}
@@ -288,7 +297,7 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
                     />
                   </div>
 
-                  <div>
+                  <div class="w-full">
                     <EnvironmentVariablesEditor disabled={props.isLoading} />
                   </div>
                 </div>
