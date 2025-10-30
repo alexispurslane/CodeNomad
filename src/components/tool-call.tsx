@@ -1,6 +1,5 @@
 import { createSignal, Show, For, createEffect } from "solid-js"
-import { isToolCallExpanded, toggleToolCallExpanded } from "../stores/tool-call-state"
-import { CodeBlockInline } from "./code-block-inline"
+import { isToolCallExpanded, toggleToolCallExpanded, setToolCallExpanded } from "../stores/tool-call-state"
 import { Markdown } from "./markdown"
 import { useTheme } from "../lib/theme"
 
@@ -98,14 +97,22 @@ function getLanguageFromPath(path: string): string | undefined {
   return ext ? langMap[ext] : undefined
 }
 
-function hasMarkdownCodeBlocks(text: string): boolean {
-  return /```[\s\S]*?```/.test(text)
-}
-
 export default function ToolCall(props: ToolCallProps) {
   const { isDark } = useTheme()
   const toolCallId = () => props.toolCallId || props.toolCall?.id || ""
   const expanded = () => isToolCallExpanded(toolCallId())
+  const [initializedId, setInitializedId] = createSignal<string | null>(null)
+
+  createEffect(() => {
+    const id = toolCallId()
+    if (!id || initializedId() === id) return
+
+    const tool = props.toolCall?.tool || ""
+    const shouldExpand = tool !== "read"
+
+    setToolCallExpanded(id, shouldExpand)
+    setInitializedId(id)
+  })
 
   const statusIcon = () => {
     const status = props.toolCall?.state?.status || ""
@@ -252,16 +259,9 @@ export default function ToolCall(props: ToolCallProps) {
     }
   }
 
-  const hasResult = () => {
-    const status = props.toolCall?.state?.status || ""
-    return status === "completed" || status === "error"
-  }
-
-  const renderToolBody = () => {
+  function renderToolBody() {
     const toolName = props.toolCall?.tool || ""
     const state = props.toolCall?.state || {}
-    const input = state.input || {}
-    const metadata = state.metadata || {}
 
     if (toolName === "todoread") {
       return null
@@ -271,125 +271,149 @@ export default function ToolCall(props: ToolCallProps) {
       return null
     }
 
+    if (toolName === "todowrite") {
+      return renderTodowriteTool()
+    }
+
+    if (toolName === "task") {
+      return renderTaskTool()
+    }
+
+    return renderMarkdownTool(toolName, state)
+  }
+
+  function renderMarkdownTool(toolName: string, state: any) {
+    const content = getMarkdownContent(toolName, state)
+    if (!content) {
+      return null
+    }
+
+    const isLarge = toolName === "edit" || toolName === "write" || toolName === "patch"
+    const messageClass = `message-text tool-call-markdown${isLarge ? " tool-call-markdown-large" : ""}`
+
+    return (
+      <div class={messageClass}>
+        <Markdown part={{ type: "text", text: content }} isDark={isDark()} />
+      </div>
+    )
+  }
+
+  function getMarkdownContent(toolName: string, state: any): string | null {
+    const input = state?.input || {}
+    const metadata = state?.metadata || {}
+
     switch (toolName) {
-      case "read":
-        return renderReadTool()
-
-      case "edit":
-        return renderEditTool()
-
-      case "write":
-        return renderWriteTool()
-
-      case "bash":
-        return renderBashTool()
-
-      case "webfetch":
-        return renderWebfetchTool()
-
-      case "todowrite":
-        return renderTodowriteTool()
-
-      case "task":
-        return renderTaskTool()
-
-      default:
-        return renderDefaultTool()
-    }
-  }
-
-  const renderReadTool = () => {
-    const state = props.toolCall?.state || {}
-    const metadata = state.metadata || {}
-    const input = state.input || {}
-    const preview = metadata.preview
-
-    if (preview && input.filePath) {
-      const lines = preview.split("\n")
-      const truncated = lines.slice(0, 6).join("\n")
-      const language = getLanguageFromPath(input.filePath)
-      return <CodeBlockInline code={truncated} language={language} />
-    }
-
-    return null
-  }
-
-  const renderEditTool = () => {
-    const state = props.toolCall?.state || {}
-    const metadata = state.metadata || {}
-    const diff = metadata.diff
-
-    if (diff) {
-      return (
-        <div class="tool-call-diff">
-          <CodeBlockInline code={diff} language="diff" />
-        </div>
-      )
-    }
-
-    return null
-  }
-
-  const renderWriteTool = () => {
-    const state = props.toolCall?.state || {}
-    const input = state.input || {}
-
-    if (input.content && input.filePath) {
-      const lines = input.content.split("\n")
-      const truncated = lines.slice(0, 10).join("\n")
-      const language = getLanguageFromPath(input.filePath)
-      return <CodeBlockInline code={truncated} language={language} />
-    }
-
-    return null
-  }
-
-  const renderBashTool = () => {
-    const state = props.toolCall?.state || {}
-    const input = state.input || {}
-    const metadata = state.metadata || {}
-    const output = metadata.output
-
-    if (input.command) {
-      const fullOutput = `$ ${input.command}${output ? "\n" + output : ""}`
-
-      if (output && hasMarkdownCodeBlocks(output)) {
-        return (
-          <div class="tool-call-bash">
-            <div class="message-text">
-              <Markdown part={{ type: "text", text: fullOutput }} isDark={isDark()} />
-            </div>
-          </div>
-        )
+      case "read": {
+        const preview = typeof metadata.preview === "string" ? metadata.preview : null
+        const language = getLanguageFromPath(input.filePath || "")
+        return ensureMarkdownContent(preview, language, true)
       }
 
-      return (
-        <div class="tool-call-bash">
-          <CodeBlockInline code={fullOutput} language="bash" />
-        </div>
-      )
-    }
-
-    return null
-  }
-
-  const renderWebfetchTool = () => {
-    const state = props.toolCall?.state || {}
-    const output = state.output
-
-    if (output) {
-      const lines = output.split("\n")
-      const truncated = lines.slice(0, 10).join("\n")
-
-      if (hasMarkdownCodeBlocks(truncated)) {
-        return (
-          <div class="message-text">
-            <Markdown part={{ type: "text", text: truncated }} isDark={isDark()} />
-          </div>
-        )
+      case "edit": {
+        const diffText = typeof metadata.diff === "string" ? metadata.diff : null
+        const fallback = typeof state.output === "string" ? state.output : null
+        return ensureMarkdownContent(diffText || fallback, "diff", true)
       }
 
-      return <CodeBlockInline code={truncated} language="markdown" />
+      case "write": {
+        const content = typeof input.content === "string" ? input.content : null
+        const metadataContent = typeof metadata.content === "string" ? metadata.content : null
+        const language = getLanguageFromPath(input.filePath || "")
+        return ensureMarkdownContent(content || metadataContent, language, true)
+      }
+
+      case "patch": {
+        const patchContent = typeof metadata.diff === "string" ? metadata.diff : null
+        const fallback = typeof state.output === "string" ? state.output : null
+        return ensureMarkdownContent(patchContent || fallback, "diff", true)
+      }
+
+      case "bash": {
+        const command = typeof input.command === "string" && input.command.length > 0 ? `$ ${input.command}` : ""
+        const outputResult = formatUnknown(metadata.output ?? state.output)
+        const parts = [command, outputResult?.text].filter(Boolean)
+        const combined = parts.join("\n")
+        return ensureMarkdownContent(combined, "bash", true)
+      }
+
+      case "webfetch": {
+        const result = formatUnknown(state.output ?? metadata.output)
+        if (!result) return null
+        return ensureMarkdownContent(result.text, result.language, true)
+      }
+
+      default: {
+        const result = formatUnknown(
+          state.output ?? metadata.output ?? metadata.diff ?? metadata.preview ?? input.content,
+        )
+        if (!result) return null
+        return ensureMarkdownContent(result.text, result.language, true)
+      }
+    }
+  }
+
+  function ensureMarkdownContent(
+    value: string | null,
+    language?: string,
+    forceFence = false,
+  ): string | null {
+    if (!value) {
+      return null
+    }
+
+    const trimmed = value.replace(/\s+$/, "")
+    if (!trimmed) {
+      return null
+    }
+
+    const startsWithFence = trimmed.trimStart().startsWith("```")
+    if (startsWithFence && !forceFence) {
+      return trimmed
+    }
+
+    const langSuffix = language ? language : ""
+    if (language || forceFence) {
+      return `\u0060\u0060\u0060${langSuffix}\n${trimmed}\n\u0060\u0060\u0060`
+    }
+
+    return trimmed
+  }
+
+  function formatUnknown(value: unknown): { text: string; language?: string } | null {
+    if (value === null || value === undefined) {
+      return null
+    }
+
+    if (typeof value === "string") {
+      return { text: value }
+    }
+
+    if (typeof value === "number" || typeof value === "boolean") {
+      return { text: String(value) }
+    }
+
+    if (Array.isArray(value)) {
+      const parts = value
+        .map((item) => {
+          const formatted = formatUnknown(item)
+          return formatted?.text ?? ""
+        })
+        .filter(Boolean)
+
+      if (parts.length === 0) {
+        return null
+      }
+
+      return { text: parts.join("\n") }
+    }
+
+    if (typeof value === "object") {
+      try {
+        return { text: JSON.stringify(value, null, 2), language: "json" }
+      } catch (error) {
+        console.error("Failed to stringify tool call output", error)
+        return { text: String(value) }
+      }
     }
 
     return null
@@ -466,28 +490,6 @@ export default function ToolCall(props: ToolCallProps) {
         </For>
       </div>
     )
-  }
-
-  const renderDefaultTool = () => {
-    const state = props.toolCall?.state || {}
-    const output = state.output
-
-    if (output) {
-      const lines = output.split("\n")
-      const truncated = lines.slice(0, 10).join("\n")
-
-      if (hasMarkdownCodeBlocks(truncated)) {
-        return (
-          <div class="message-text">
-            <Markdown part={{ type: "text", text: truncated }} isDark={isDark()} />
-          </div>
-        )
-      }
-
-      return <CodeBlockInline code={truncated} />
-    }
-
-    return null
   }
 
   const renderError = () => {
