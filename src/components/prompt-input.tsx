@@ -716,6 +716,7 @@ export default function PromptInput(props: PromptInputProps) {
             disabled={props.disabled}
             rows={1}
             style={attachments().length > 0 ? { "padding-top": "8px" } : {}}
+            spellcheck={false}
           />
         </div>
 
