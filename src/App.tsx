@@ -42,6 +42,7 @@ import {
   setActiveParentSession,
   clearActiveParentSession,
   createSession,
+  forkSession,
   deleteSession,
   getSessionFamily,
   activeParentSessionId,
@@ -53,6 +54,7 @@ import {
   updateSessionModel,
   agents,
   isSessionBusy,
+  getSessionInfo,
 } from "./stores/sessions"
 import { setupTabKeyboardShortcuts } from "./lib/keyboard"
 import { isOpen as isCommandPaletteOpen, showCommandPalette, hideCommandPalette } from "./stores/command-palette"
@@ -61,6 +63,7 @@ import { registerInputShortcuts } from "./lib/shortcuts/input"
 import { registerAgentShortcuts } from "./lib/shortcuts/agent"
 import { registerEscapeShortcut, setEscapeStateChangeHandler } from "./lib/shortcuts/escape"
 import { keyboardRegistry } from "./lib/keyboard-registry"
+import type { KeyboardShortcut } from "./lib/keyboard-registry"
 
 const SessionView: Component<{
   sessionId: string
@@ -81,8 +84,27 @@ const SessionView: Component<{
   async function handleSendMessage(prompt: string, attachments: Attachment[]) {
     await sendMessage(props.instanceId, props.sessionId, prompt, attachments)
   }
-
+ 
+  function getUserMessageText(messageId: string): string | null {
+    const currentSession = session()
+    if (!currentSession) return null
+ 
+    const targetMessage = currentSession.messages.find((m) => m.id === messageId)
+    const targetInfo = currentSession.messagesInfo.get(messageId)
+    if (!targetMessage || targetInfo?.role !== "user") {
+      return null
+    }
+ 
+    const textParts = targetMessage.parts.filter((p: any) => p.type === "text")
+    if (textParts.length === 0) {
+      return null
+    }
+ 
+    return textParts.map((p: any) => p.text).join("\n")
+  }
+ 
   async function handleRevert(messageId: string) {
+
     const instance = instances().get(props.instanceId)
     if (!instance || !instance.client) return
 
@@ -94,24 +116,16 @@ const SessionView: Component<{
         body: { messageID: messageId },
       })
 
-      // Restore the message to input
-      const currentSession = session()
-      if (currentSession) {
-        const revertedMessage = currentSession.messages.find((m) => m.id === messageId)
-        const revertedInfo = currentSession.messagesInfo.get(messageId)
-
-        if (revertedMessage && revertedInfo?.role === "user") {
-          const textParts = revertedMessage.parts.filter((p: any) => p.type === "text")
-          if (textParts.length > 0) {
-            const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
-            if (textarea) {
-              textarea.value = textParts.map((p: any) => p.text).join("\n")
-              textarea.dispatchEvent(new Event("input", { bubbles: true }))
-              textarea.focus()
-            }
-          }
+      const restoredText = getUserMessageText(messageId)
+      if (restoredText) {
+        const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
+        if (textarea) {
+          textarea.value = restoredText
+          textarea.dispatchEvent(new Event("input", { bubbles: true }))
+          textarea.focus()
         }
       }
+
 
       console.log("Reverted to message - UI will update via SSE")
     } catch (error) {
@@ -119,6 +133,40 @@ const SessionView: Component<{
       alert("Failed to revert to message")
     }
   }
+
+  async function handleFork(messageId?: string) {
+    if (!messageId) {
+      console.warn("Fork requires a user message id")
+      return
+    }
+ 
+    const restoredText = getUserMessageText(messageId)
+ 
+    try {
+      const forkedSession = await forkSession(props.instanceId, props.sessionId, { messageId })
+ 
+      const parentToActivate = forkedSession.parentId ?? forkedSession.id
+      setActiveParentSession(props.instanceId, parentToActivate)
+      if (forkedSession.parentId) {
+        setActiveSession(props.instanceId, forkedSession.id)
+      }
+ 
+      await loadMessages(props.instanceId, forkedSession.id).catch(console.error)
+ 
+      if (restoredText) {
+        const textarea = document.querySelector(".prompt-input") as HTMLTextAreaElement
+        if (textarea) {
+          textarea.value = restoredText
+          textarea.dispatchEvent(new Event("input", { bubbles: true }))
+          textarea.focus()
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fork session:", error)
+      alert("Failed to fork session")
+    }
+  }
+
 
   return (
     <Show
@@ -138,6 +186,7 @@ const SessionView: Component<{
             messagesInfo={s().messagesInfo}
             revert={s().revert}
             onRevert={handleRevert}
+            onFork={handleFork}
           />
           <PromptInput
             instanceId={props.instanceId}
@@ -149,6 +198,71 @@ const SessionView: Component<{
         </div>
       )}
     </Show>
+  )
+}
+
+const formatTokenTotal = (value: number) => {
+  if (value >= 1_000_000) {
+    return `${(value / 1_000_000).toFixed(1)}M`
+  }
+  if (value >= 1_000) {
+    return `${(value / 1_000).toFixed(0)}K`
+  }
+  return value.toLocaleString()
+}
+
+const ContextUsagePanel: Component<{ instanceId: string; sessionId: string }> = (props) => {
+  const info = createMemo(
+    () =>
+      getSessionInfo(props.instanceId, props.sessionId) ?? {
+        tokens: 0,
+        cost: 0,
+        contextWindow: 0,
+        isSubscriptionModel: false,
+      },
+  )
+
+  const tokens = createMemo(() => info().tokens)
+  const contextWindow = createMemo(() => info().contextWindow)
+  const percentage = createMemo(() => {
+    const windowSize = contextWindow()
+    if (!windowSize || windowSize <= 0) return null
+    const percent = Math.round((tokens() / windowSize) * 100)
+    return Math.min(100, Math.max(0, percent))
+  })
+
+  const costLabel = createMemo(() => {
+    if (info().isSubscriptionModel || info().cost <= 0) return "Included in plan"
+    return `$${info().cost.toFixed(2)} spent`
+  })
+
+  return (
+    <div class="session-context-panel border-r border-base border-b px-3 py-3">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <div class="text-xs font-semibold text-primary/70 uppercase tracking-wide">Tokens (last call)</div>
+          <div class="text-lg font-semibold text-primary">{formatTokenTotal(tokens())}</div>
+        </div>
+        <div class="text-xs text-primary/70 text-right leading-tight">{costLabel()}</div>
+      </div>
+      <div class="mt-4">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-xs font-semibold text-primary/70 uppercase tracking-wide">Context window usage</div>
+          <div class="text-sm font-medium text-primary">{percentage() !== null ? `${percentage()}%` : "--"}</div>
+        </div>
+        <div class="text-sm text-primary/90">
+          {contextWindow()
+            ? `${formatTokenTotal(tokens())} of ${formatTokenTotal(contextWindow())}`
+            : "Window size unavailable"}
+        </div>
+      </div>
+      <div class="mt-3 h-1.5 rounded-full bg-base relative overflow-hidden">
+        <div
+          class="absolute inset-y-0 left-0 rounded-full bg-accent-primary transition-[width]"
+          style={{ width: percentage() === null ? "0%" : `${percentage()}%` }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -356,10 +470,10 @@ const App: Component = () => {
 
     commandRegistry.register({
       id: "switch-to-info",
-      label: "Switch to Info",
-      description: "Jump to info view for current instance",
-      category: "Session",
-      keywords: ["info", "info", "console", "output"],
+      label: "Instance Info",
+      description: "Open the instance overview for logs and status",
+      category: "Instance",
+      keywords: ["info", "logs", "console", "output"],
       shortcut: { key: "L", meta: true, shift: true },
       action: () => {
         const instance = activeInstance()
@@ -826,59 +940,55 @@ const App: Component = () => {
                         class="session-sidebar flex flex-col bg-surface-secondary"
                         style={{ width: `${sessionSidebarWidth()}px` }}
                       >
-                        <SessionList
-                          instanceId={instance().id}
-                          sessions={activeSessions()}
-                          activeSessionId={activeSessionIdForInstance()}
-                          onSelect={(id) => setActiveSession(instance().id, id)}
-                          onClose={(id) => handleCloseSession(instance().id, id)}
-                          onNew={() => handleNewSession(instance().id)}
-                          showHeader
-                          showFooter={false}
-                          headerContent={
-                            <div class="session-sidebar-header">
-                              <span class="session-sidebar-title text-sm font-semibold text-primary">Sessions</span>
-                              <div class="session-sidebar-shortcuts">
-                                {(() => {
-                                  const shortcut = keyboardRegistry.get("session-prev")
-                                  return shortcut ? <KeyboardHint shortcuts={[shortcut]} separator="" /> : null
-                                })()}
-                                {(() => {
-                                  const shortcut = keyboardRegistry.get("session-next")
-                                  return shortcut ? <KeyboardHint shortcuts={[shortcut]} separator="" /> : null
-                                })()}
-                              </div>
-                              <button
-                                class="session-sidebar-new inline-flex items-center justify-center gap-1.5 rounded-md border border-base px-3 py-2 text-xs font-semibold transition-colors hover:border-accent-primary hover:text-accent-primary"
-                                onClick={() => handleNewSession(instance().id)}
-                                type="button"
-                                aria-label="Create new session"
-                                title="New session (Cmd/Ctrl+Shift+N)"
-                              >
-                                <span class="leading-none">New Session</span>
-                              </button>
-                            </div>
-                          }
+                            <SessionList
+                              instanceId={instance().id}
+                              sessions={activeSessions()}
+                              activeSessionId={activeSessionIdForInstance()}
+                              onSelect={(id) => setActiveSession(instance().id, id)}
+                              onClose={(id) => handleCloseSession(instance().id, id)}
+                              onNew={() => handleNewSession(instance().id)}
+                              showHeader
+                              showFooter={false}
+                              headerContent={
+                                <div class="session-sidebar-header">
+                                  <span class="session-sidebar-title text-sm font-semibold uppercase text-primary">Sessions</span>
+                                  <div class="session-sidebar-shortcuts">
+                                    {(() => {
+                                      const shortcuts = [
+                                        keyboardRegistry.get("session-prev"),
+                                        keyboardRegistry.get("session-next"),
+                                      ].filter((shortcut): shortcut is KeyboardShortcut => Boolean(shortcut))
+                                      return shortcuts.length ? (
+                                        <KeyboardHint shortcuts={shortcuts} separator=" " showDescription={false} />
+                                      ) : null
+                                    })()}
+                                  </div>
+                                </div>
+                              }
 
-                          onWidthChange={setSessionSidebarWidth}
-                        />
+                              onWidthChange={setSessionSidebarWidth}
+                            />
+
                         <div class="session-sidebar-separator border-t border-base" />
                         <Show when={activeSessionForInstance()}>
                           {(activeSession) => (
-                            <div class="session-sidebar-controls px-3 py-3 border-r border-base flex flex-col gap-3">
-                              <AgentSelector
-                                instanceId={instance().id}
-                                sessionId={activeSession().id}
-                                currentAgent={activeSession().agent}
-                                onAgentChange={handleSidebarAgentChange}
-                              />
-                              <ModelSelector
-                                instanceId={instance().id}
-                                sessionId={activeSession().id}
-                                currentModel={activeSession().model}
-                                onModelChange={handleSidebarModelChange}
-                              />
-                            </div>
+                            <>
+                              <ContextUsagePanel instanceId={instance().id} sessionId={activeSession().id} />
+                              <div class="session-sidebar-controls px-3 py-3 border-r border-base flex flex-col gap-3">
+                                <AgentSelector
+                                  instanceId={instance().id}
+                                  sessionId={activeSession().id}
+                                  currentAgent={activeSession().agent}
+                                  onAgentChange={handleSidebarAgentChange}
+                                />
+                                <ModelSelector
+                                  instanceId={instance().id}
+                                  sessionId={activeSession().id}
+                                  currentModel={activeSession().model}
+                                  onModelChange={handleSidebarModelChange}
+                                />
+                              </div>
+                            </>
                           )}
                         </Show>
                       </div>

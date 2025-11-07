@@ -89,24 +89,17 @@ function formatTokens(tokens: number): string {
   return tokens.toString()
 }
 
-// Format session info like TUI (e.g., "110K/73% ($0.42)" or "110K/73%")
-function formatSessionInfo(tokens: number, cost: number, contextWindow: number, isSubscriptionModel: boolean): string {
+// Format session info for the session view header
+function formatSessionInfo(tokens: number, _cost: number, contextWindow: number, _isSubscriptionModel: boolean): string {
   const tokensStr = formatTokens(tokens)
 
-  // Calculate percentage if we have context window
   if (contextWindow > 0) {
-    const percentage = Math.round((tokens / contextWindow) * 100)
-    if (isSubscriptionModel) {
-      return `${tokensStr}/${percentage}%`
-    }
-    return `${tokensStr}/${percentage}% ($${cost.toFixed(2)})`
+    const windowStr = formatTokens(contextWindow)
+    const percentage = Math.min(100, Math.max(0, Math.round((tokens / contextWindow) * 100)))
+    return `${tokensStr} of ${windowStr} (${percentage}%)`
   }
 
-  // Fallback without context window
-  if (isSubscriptionModel) {
-    return tokensStr
-  }
-  return `${tokensStr} ($${cost.toFixed(2)})`
+  return tokensStr
 }
 
 interface MessageStreamProps {
@@ -122,6 +115,7 @@ interface MessageStreamProps {
   }
   loading?: boolean
   onRevert?: (messageId: string) => void
+  onFork?: (messageId?: string) => void
 }
 
 interface MessageDisplayItem {
@@ -609,7 +603,9 @@ export default function MessageStream(props: MessageStreamProps) {
                   isQueued={item.isQueued}
                   parts={item.combinedParts}
                   onRevert={props.onRevert}
+                  onFork={props.onFork}
                 />
+
               )
             }
 

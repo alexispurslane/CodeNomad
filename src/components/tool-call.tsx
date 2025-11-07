@@ -136,12 +136,29 @@ export default function ToolCall(props: ToolCallProps) {
   const expanded = () => isToolCallExpanded(toolCallId())
   const [initializedId, setInitializedId] = createSignal<string | null>(null)
 
-  let markdownContainerRef: HTMLDivElement | undefined
+  let scrollContainerRef: HTMLDivElement | undefined
 
-  const handleMarkdownRendered = () => {
+  const handleScrollRendered = () => {
     const id = toolCallId()
-    if (!id || !markdownContainerRef) return
-    restoreScrollState(id, markdownContainerRef)
+    if (!id || !scrollContainerRef) return
+    restoreScrollState(id, scrollContainerRef)
+  }
+
+  const initializeScrollContainer = (element: HTMLDivElement | null | undefined) => {
+    const resolvedElement = element || undefined
+    scrollContainerRef = resolvedElement
+    const id = toolCallId()
+    if (!resolvedElement || !id) return
+
+    if (!toolScrollState.has(id)) {
+      requestAnimationFrame(() => {
+        if (!scrollContainerRef || toolCallId() !== id) return
+        scrollContainerRef.scrollTop = scrollContainerRef.scrollHeight
+        updateScrollState(id, scrollContainerRef)
+      })
+    } else {
+      restoreScrollState(id, resolvedElement)
+    }
   }
 
   createEffect(() => {
@@ -162,6 +179,15 @@ export default function ToolCall(props: ToolCallProps) {
 
     onCleanup(() => {
       toolScrollState.delete(id)
+    })
+  })
+
+  createEffect(() => {
+    if (props.toolCall?.tool !== "task") return
+    const summarySignature = JSON.stringify(props.toolCall?.state?.metadata?.summary ?? [])
+    requestAnimationFrame(() => {
+      void summarySignature
+      handleScrollRendered()
     })
   })
 
@@ -348,28 +374,14 @@ export default function ToolCall(props: ToolCallProps) {
     return (
       <div
         class={messageClass}
-        ref={(element) => {
-          markdownContainerRef = element || undefined
-          const id = toolCallId()
-          if (!element || !id) return
-
-          if (!toolScrollState.has(id)) {
-            requestAnimationFrame(() => {
-              if (!markdownContainerRef || toolCallId() !== id) return
-              markdownContainerRef.scrollTop = markdownContainerRef.scrollHeight
-              updateScrollState(id, markdownContainerRef)
-            })
-          } else {
-            restoreScrollState(id, element)
-          }
-        }}
+        ref={(element) => initializeScrollContainer(element)}
         onScroll={(event) => updateScrollState(toolCallId(), event.currentTarget)}
       >
         <Markdown
           part={markdownPart}
           isDark={isDark()}
           disableHighlight={disableHighlight}
-          onRendered={handleMarkdownRendered}
+          onRendered={handleScrollRendered}
         />
       </div>
     )
@@ -537,34 +549,40 @@ export default function ToolCall(props: ToolCallProps) {
     }
 
     return (
-      <div class="tool-call-task-summary">
-        <For each={summary}>
-          {(item) => {
-            const tool = item.tool || "unknown"
-            const itemInput = item.state?.input || {}
-            const icon = getToolIcon(tool)
+      <div
+        class="message-text tool-call-markdown tool-call-markdown-large tool-call-task-container"
+        ref={(element) => initializeScrollContainer(element)}
+        onScroll={(event) => updateScrollState(toolCallId(), event.currentTarget)}
+      >
+        <div class="tool-call-task-summary">
+          <For each={summary}>
+            {(item) => {
+              const tool = item.tool || "unknown"
+              const itemInput = item.state?.input || {}
+              const icon = getToolIcon(tool)
 
-            let description = ""
-            switch (tool) {
-              case "bash":
-                description = itemInput.description || itemInput.command || ""
-                break
-              case "edit":
-              case "read":
-              case "write":
-                description = `${tool} ${getRelativePath(itemInput.filePath || "")}`
-                break
-              default:
-                description = tool
-            }
+              let description = ""
+              switch (tool) {
+                case "bash":
+                  description = itemInput.description || itemInput.command || ""
+                  break
+                case "edit":
+                case "read":
+                case "write":
+                  description = `${tool} ${getRelativePath(itemInput.filePath || "")}`
+                  break
+                default:
+                  description = tool
+              }
 
-            return (
-              <div class="tool-call-task-item">
-                {icon} {description}
-              </div>
-            )
-          }}
-        </For>
+              return (
+                <div class="tool-call-task-item">
+                  {icon} {description}
+                </div>
+              )
+            }}
+          </For>
+        </div>
       </div>
     )
   }

@@ -581,6 +581,87 @@ async function createSession(instanceId: string, agent?: string): Promise<Sessio
   }
 }
 
+
+async function forkSession(
+  instanceId: string,
+  sourceSessionId: string,
+  options?: { messageId?: string },
+): Promise<Session> {
+  const instance = instances().get(instanceId)
+  if (!instance || !instance.client) {
+    throw new Error("Instance not ready")
+  }
+
+  const request: {
+    path: { id: string }
+    body?: { messageID: string }
+  } = {
+    path: { id: sourceSessionId },
+  }
+
+  if (options?.messageId) {
+    request.body = { messageID: options.messageId }
+  }
+
+  const response = await instance.client.session.fork(request)
+
+  if (!response.data) {
+    throw new Error("Failed to fork session: No data returned")
+  }
+
+  const info = response.data
+  const forkedSession: Session = {
+    id: info.id,
+    instanceId,
+    title: info.title || "Forked Session",
+    parentId: info.parentID || null,
+    agent: info.agent || "",
+    model: {
+      providerId: info.model?.providerID || "",
+      modelId: info.model?.modelID || "",
+    },
+    time: {
+      created: info.time?.created || Date.now(),
+      updated: info.time?.updated || Date.now(),
+    },
+    revert: info.revert
+      ? {
+          messageID: info.revert.messageID,
+          partID: info.revert.partID,
+          snapshot: info.revert.snapshot,
+          diff: info.revert.diff,
+        }
+      : undefined,
+    messages: [],
+    messagesInfo: new Map(),
+  }
+
+  setSessions((prev) => {
+    const next = new Map(prev)
+    const instanceSessions = next.get(instanceId) || new Map()
+    instanceSessions.set(forkedSession.id, forkedSession)
+    next.set(instanceId, instanceSessions)
+    return next
+  })
+
+  setSessionInfoByInstance((prev) => {
+    const next = new Map(prev)
+    const instanceInfo = new Map(prev.get(instanceId))
+    instanceInfo.set(forkedSession.id, {
+      tokens: 0,
+      cost: 0,
+      contextWindow: 0,
+      isSubscriptionModel: false,
+    })
+    next.set(instanceId, instanceInfo)
+    return next
+  })
+
+  getSessionIndex(instanceId, forkedSession.id)
+
+  return forkedSession
+}
+
 async function deleteSession(instanceId: string, sessionId: string): Promise<void> {
   const instance = instances().get(instanceId)
   if (!instance || !instance.client) {
@@ -1614,6 +1695,7 @@ export {
   getSessionInfo,
   fetchSessions,
   createSession,
+  forkSession,
   deleteSession,
   fetchAgents,
   fetchProviders,

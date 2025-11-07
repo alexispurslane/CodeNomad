@@ -104,7 +104,8 @@ const CommandPalette: Component<CommandPaletteProps> = (props) => {
       setSelectedIndex((i) => Math.min(i + 1, filtered.length - 1))
     } else if (e.key === "ArrowUp") {
       e.preventDefault()
-      setSelectedIndex((i) => Math.max(i - 1, 0))
+      if (filtered.length === 0) return
+      setSelectedIndex((i) => (i <= 0 ? filtered.length - 1 : i - 1))
     } else if (e.key === "Enter") {
       e.preventDefault()
       const selected = filtered[selectedIndex()]

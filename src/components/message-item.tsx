@@ -10,6 +10,7 @@ interface MessageItemProps {
   isQueued?: boolean
   parts?: any[]
   onRevert?: (messageId: string) => void
+  onFork?: (messageId?: string) => void
 }
 
 export default function MessageItem(props: MessageItemProps) {
@@ -73,12 +74,22 @@ export default function MessageItem(props: MessageItemProps) {
           <span class="text-[11px] text-[var(--text-muted)]">{timestamp()}</span>
           <Show when={isUser() && props.onRevert}>
             <button
-              class="bg-transparent border border-[var(--border-base)] text-[var(--text-muted)] cursor-pointer px-2 py-0.5 rounded text-sm leading-none transition-all duration-200 flex items-center justify-center min-w-7 h-6 hover:bg-[var(--surface-hover)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] active:scale-95"
+              class="bg-transparent border border-[var(--border-base)] text-[var(--text-muted)] cursor-pointer px-3 py-0.5 rounded text-xs font-semibold leading-none transition-all duration-200 flex items-center justify-center h-6 hover:bg-[var(--surface-hover)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] active:scale-95"
               onClick={handleRevert}
               title="Revert to this message"
               aria-label="Revert to this message"
             >
-              ↶
+              Revert to
+            </button>
+          </Show>
+          <Show when={isUser() && props.onFork}>
+            <button
+              class="bg-transparent border border-[var(--border-base)] text-[var(--text-muted)] cursor-pointer px-3 py-0.5 rounded text-xs font-semibold leading-none transition-all duration-200 flex items-center justify-center h-6 hover:bg-[var(--surface-hover)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] active:scale-95"
+              onClick={() => props.onFork?.(props.message.id)}
+              title="Fork from this message"
+              aria-label="Fork from this message"
+            >
+              Fork
             </button>
           </Show>
         </div>

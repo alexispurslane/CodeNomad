@@ -7,6 +7,7 @@ import HintRow from "./hint-row"
 const KeyboardHint: Component<{
   shortcuts: KeyboardShortcut[]
   separator?: string
+  showDescription?: boolean
 }> = (props) => {
   function buildShortcutString(shortcut: KeyboardShortcut): string {
     const parts: string[] = []
@@ -31,7 +32,7 @@ const KeyboardHint: Component<{
         {(shortcut, i) => (
           <>
             {i() > 0 && <span class="mx-1">{props.separator || "•"}</span>}
-            <span class="mr-1">{shortcut.description}</span>
+            {props.showDescription !== false && <span class="mr-1">{shortcut.description}</span>}
             <Kbd shortcut={buildShortcutString(shortcut)} />
           </>
         )}
