@@ -6,7 +6,7 @@ import { instances } from "./instances"
 
 import { sseManager } from "../lib/sse-manager"
 import { decodeHtmlEntities } from "../lib/markdown"
-import { preferences } from "./preferences"
+import { preferences, addRecentModelPreference, getAgentModelPreference, setAgentModelPreference } from "./preferences"
 
 interface SessionInfo {
   tokens: number
@@ -330,6 +330,28 @@ async function fetchSessions(instanceId: string): Promise<void> {
   }
 }
 
+function isModelValid(
+  instanceId: string,
+  model?: { providerId: string; modelId: string } | null,
+): model is { providerId: string; modelId: string } {
+  if (!model?.providerId || !model.modelId) return false
+  const instanceProviders = providers().get(instanceId) || []
+  const provider = instanceProviders.find((p) => p.id === model.providerId)
+  if (!provider) return false
+  return provider.models.some((item) => item.id === model.modelId)
+}
+
+function getRecentModelPreferenceForInstance(
+  instanceId: string,
+): { providerId: string; modelId: string } | undefined {
+  const recents = preferences().modelRecents ?? []
+  for (const item of recents) {
+    if (isModelValid(instanceId, item)) {
+      return item
+    }
+  }
+}
+
 async function getDefaultModel(
   instanceId: string,
   agentName?: string,
@@ -338,8 +360,15 @@ async function getDefaultModel(
   const instanceAgents = agents().get(instanceId) || []
 
   if (agentName) {
+    const stored = getAgentModelPreference(instanceId, agentName)
+    if (isModelValid(instanceId, stored)) {
+      return stored
+    }
+  }
+
+  if (agentName) {
     const agent = instanceAgents.find((a) => a.name === agentName)
-    if (agent?.model?.providerId && agent.model.modelId) {
+    if (agent && agent.model && isModelValid(instanceId, agent.model)) {
       return {
         providerId: agent.model.providerId,
         modelId: agent.model.modelId,
@@ -347,25 +376,30 @@ async function getDefaultModel(
     }
   }
 
-  const anthropicProvider = instanceProviders.find((p) => p.id === "anthropic")
-  if (anthropicProvider) {
-    const defaultModelId = anthropicProvider.defaultModelId || anthropicProvider.models[0]?.id
-    if (defaultModelId) {
-      return {
-        providerId: "anthropic",
-        modelId: defaultModelId,
+  const recent = getRecentModelPreferenceForInstance(instanceId)
+  if (recent) {
+    return recent
+  }
+
+  for (const provider of instanceProviders) {
+    if (provider.defaultModelId) {
+      const model = provider.models.find((m) => m.id === provider.defaultModelId)
+      if (model) {
+        return {
+          providerId: provider.id,
+          modelId: model.id,
+        }
       }
     }
   }
 
   if (instanceProviders.length > 0) {
     const firstProvider = instanceProviders[0]
-    const defaultModelId = firstProvider.defaultModelId || firstProvider.models[0]?.id
-
-    if (defaultModelId) {
+    const firstModel = firstProvider.models[0]
+    if (firstModel) {
       return {
         providerId: firstProvider.id,
-        modelId: defaultModelId,
+        modelId: firstModel.id,
       }
     }
   }
@@ -468,6 +502,10 @@ async function createSession(instanceId: string, agent?: string): Promise<Sessio
   const selectedAgent = agent || (nonSubagents.length > 0 ? nonSubagents[0].name : "")
 
   const defaultModel = await getDefaultModel(instanceId, selectedAgent)
+
+  if (selectedAgent && isModelValid(instanceId, defaultModel)) {
+    setAgentModelPreference(instanceId, selectedAgent, defaultModel)
+  }
 
   setLoading((prev) => {
     const next = { ...prev }
@@ -1457,16 +1495,27 @@ async function updateSessionAgent(instanceId: string, sessionId: string, agent: 
     throw new Error("Session not found")
   }
 
+  const nextModel = await getDefaultModel(instanceId, agent)
+  const shouldApplyModel = isModelValid(instanceId, nextModel)
+
   setSessions((prev) => {
     const next = new Map(prev)
-    const instanceSessions = new Map(prev.get(instanceId))
-    const session = instanceSessions.get(sessionId)
-    if (session) {
-      instanceSessions.set(sessionId, { ...session, agent })
-      next.set(instanceId, instanceSessions)
+    const map = new Map(prev.get(instanceId))
+    const current = map.get(sessionId)
+    if (current) {
+      map.set(sessionId, {
+        ...current,
+        agent,
+        model: shouldApplyModel ? nextModel : current.model,
+      })
+      next.set(instanceId, map)
     }
     return next
   })
+
+  if (agent && shouldApplyModel) {
+    setAgentModelPreference(instanceId, agent, nextModel)
+  }
 }
 
 async function updateSessionModel(
@@ -1480,16 +1529,28 @@ async function updateSessionModel(
     throw new Error("Session not found")
   }
 
+  if (!isModelValid(instanceId, model)) {
+    console.warn("Invalid model selection", model)
+    return
+  }
+
+  const currentAgent = session.agent
+
   setSessions((prev) => {
     const next = new Map(prev)
-    const instanceSessions = new Map(prev.get(instanceId))
-    const session = instanceSessions.get(sessionId)
-    if (session) {
-      instanceSessions.set(sessionId, { ...session, model })
-      next.set(instanceId, instanceSessions)
+    const map = new Map(prev.get(instanceId))
+    const existing = map.get(sessionId)
+    if (existing) {
+      map.set(sessionId, { ...existing, model })
+      next.set(instanceId, map)
     }
     return next
   })
+
+  if (currentAgent) {
+    setAgentModelPreference(instanceId, currentAgent, model)
+  }
+  addRecentModelPreference(model)
 }
 
 function handleSessionCompacted(instanceId: string, event: any): void {

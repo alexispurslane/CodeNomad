@@ -41,6 +41,14 @@ export default function AgentSelector(props: AgentSelectorProps) {
   })
 
   createEffect(() => {
+    const list = availableAgents()
+    if (list.length === 0) return
+    if (!list.some((agent) => agent.name === props.currentAgent)) {
+      void props.onAgentChange(list[0].name)
+    }
+  })
+
+  createEffect(() => {
     if (instanceAgents().length === 0) {
       fetchAgents(props.instanceId).catch(console.error)
     }

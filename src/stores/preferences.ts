@@ -1,10 +1,21 @@
 import { createSignal, onMount } from "solid-js"
 import { storage, type ConfigData } from "../lib/storage"
 
+export interface ModelPreference {
+  providerId: string
+  modelId: string
+}
+
+export interface AgentModelSelections {
+  [instanceId: string]: Record<string, ModelPreference>
+}
+
 export interface Preferences {
   showThinkingBlocks: boolean
   lastUsedBinary?: string
   environmentVariables?: Record<string, string>
+  modelRecents?: ModelPreference[]
+  agentModelSelections?: AgentModelSelections
 }
 
 export interface OpenCodeBinary {
@@ -19,9 +30,12 @@ export interface RecentFolder {
 }
 
 const MAX_RECENT_FOLDERS = 10
+const MAX_RECENT_MODELS = 5
 
 const defaultPreferences: Preferences = {
   showThinkingBlocks: false,
+  modelRecents: [],
+  agentModelSelections: {},
 }
 
 const [preferences, setPreferences] = createSignal<Preferences>(defaultPreferences)
@@ -127,6 +141,37 @@ function removeEnvironmentVariable(key: string): void {
   updateEnvironmentVariables(rest)
 }
 
+function addRecentModelPreference(model: ModelPreference): void {
+  if (!model.providerId || !model.modelId) return
+  const recents = preferences().modelRecents ?? []
+  const filtered = recents.filter((item) => item.providerId !== model.providerId || item.modelId !== model.modelId)
+  const updated = [model, ...filtered].slice(0, MAX_RECENT_MODELS)
+  updatePreferences({ modelRecents: updated })
+}
+
+function setAgentModelPreference(instanceId: string, agent: string, model: ModelPreference): void {
+  if (!instanceId || !agent || !model.providerId || !model.modelId) return
+  const selections = preferences().agentModelSelections ?? {}
+  const instanceSelections = selections[instanceId] ?? {}
+  const existing = instanceSelections[agent]
+  if (existing && existing.providerId === model.providerId && existing.modelId === model.modelId) {
+    return
+  }
+  updatePreferences({
+    agentModelSelections: {
+      ...selections,
+      [instanceId]: {
+        ...instanceSelections,
+        [agent]: model,
+      },
+    },
+  })
+}
+
+function getAgentModelPreference(instanceId: string, agent: string): ModelPreference | undefined {
+  return preferences().agentModelSelections?.[instanceId]?.[agent]
+}
+
 // Load config on mount and listen for changes from other instances
 onMount(() => {
   loadConfig()
@@ -154,4 +199,7 @@ export {
   updateEnvironmentVariables,
   addEnvironmentVariable,
   removeEnvironmentVariable,
+  addRecentModelPreference,
+  setAgentModelPreference,
+  getAgentModelPreference,
 }

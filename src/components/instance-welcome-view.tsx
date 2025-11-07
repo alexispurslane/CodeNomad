@@ -1,7 +1,11 @@
-import { Component, createSignal, Show, For, createEffect, onMount, onCleanup } from "solid-js"
+import { Component, createSignal, Show, For, createEffect, onMount, onCleanup, createMemo } from "solid-js"
 import type { Instance } from "../types/instance"
-import { getParentSessions, createSession, setActiveParentSession, agents } from "../stores/sessions"
+import { getParentSessions, createSession, setActiveParentSession } from "../stores/sessions"
 import InstanceInfo from "./instance-info"
+import KeyboardHint from "./keyboard-hint"
+import Kbd from "./kbd"
+import { keyboardRegistry, type KeyboardShortcut } from "../lib/keyboard-registry"
+import { isMac } from "../lib/keyboard-utils"
 
 
 interface InstanceWelcomeViewProps {
@@ -9,20 +13,28 @@ interface InstanceWelcomeViewProps {
 }
 
 const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
-  const [selectedAgent, setSelectedAgent] = createSignal<string>("")
   const [isCreating, setIsCreating] = createSignal(false)
   const [selectedIndex, setSelectedIndex] = createSignal(0)
   const [focusMode, setFocusMode] = createSignal<"sessions" | "new-session" | null>("sessions")
 
   const parentSessions = () => getParentSessions(props.instance.id)
-  const agentList = () => agents().get(props.instance.id) || []
-
-  createEffect(() => {
-    const list = agentList()
-    if (list.length > 0 && !selectedAgent()) {
-      setSelectedAgent(list[0].name)
+  const newSessionShortcut = createMemo<KeyboardShortcut>(() => {
+    const registered = keyboardRegistry.get("session-new")
+    if (registered) return registered
+    return {
+      id: "session-new-display",
+      key: "n",
+      modifiers: {
+        shift: true,
+        meta: isMac(),
+        ctrl: !isMac(),
+      },
+      handler: () => {},
+      description: "New Session",
+      context: "global",
     }
   })
+  const newSessionShortcutString = createMemo(() => (isMac() ? "cmd+shift+n" : "ctrl+shift+n"))
 
   createEffect(() => {
     const sessions = parentSessions()
@@ -45,7 +57,7 @@ const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
   function handleKeyDown(e: KeyboardEvent) {
     const sessions = parentSessions()
 
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault()
       handleNewSession()
       return
@@ -133,11 +145,11 @@ const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
   }
 
   async function handleNewSession() {
-    if (isCreating() || agentList().length === 0) return
+    if (isCreating()) return
 
     setIsCreating(true)
     try {
-      const session = await createSession(props.instance.id, selectedAgent())
+      const session = await createSession(props.instance.id)
       setActiveParentSession(props.instance.id, session.id)
     } catch (error) {
       console.error("Failed to create session:", error)
@@ -153,7 +165,7 @@ const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
           <Show
             when={parentSessions().length > 0}
             fallback={
-              <div class="panel panel-empty-state flex-shrink-0">
+              <div class="panel panel-empty-state flex-1 flex flex-col justify-center">
                 <div class="panel-empty-state-icon">
                   <svg class="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -169,14 +181,14 @@ const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
               </div>
             }
           >
-            <div class="panel flex-shrink-0">
+            <div class="panel flex flex-col flex-1 min-h-0">
               <div class="panel-header">
                 <h2 class="panel-title">Resume Session</h2>
                 <p class="panel-subtitle">
                   {parentSessions().length} {parentSessions().length === 1 ? "session" : "sessions"} available
                 </p>
               </div>
-              <div class="panel-list">
+              <div class="panel-list panel-list--fill flex-1 min-h-0 overflow-auto">
                 <For each={parentSessions()}>
                   {(session, index) => (
                     <div 
@@ -228,35 +240,15 @@ const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
           <div class="panel flex-shrink-0">
             <div class="panel-header">
               <h2 class="panel-title">Start New Session</h2>
-              <p class="panel-subtitle">Create a fresh conversation with your chosen agent</p>
+              <p class="panel-subtitle">We’ll reuse your last agent/model automatically</p>
             </div>
             <div class="panel-body">
               <div class="space-y-3">
-                <Show when={agentList().length > 0}>
-                  <div>
-                    <label class="block text-xs font-medium text-secondary mb-1.5">Agent</label>
-                    <select
-                      class="selector-input w-full"
-                      value={selectedAgent()}
-                      onChange={(e) => setSelectedAgent(e.currentTarget.value)}
-                    >
-                      <For each={agentList()}>
-                        {(agent) => (
-                          <option value={agent.name}>
-                            {agent.name}
-                            {agent.description ? ` - ${agent.description}` : ""}
-                          </option>
-                        )}
-                      </For>
-                    </select>
-                  </div>
-                </Show>
-
                 <button
                   type="button"
                   class="button-primary w-full flex items-center justify-center text-sm disabled:cursor-not-allowed"
                   onClick={handleNewSession}
-                  disabled={isCreating() || agentList().length === 0}
+                  disabled={isCreating()}
                 >
                   <div class="flex items-center gap-2">
                     {isCreating() ? (
@@ -273,11 +265,9 @@ const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                       </svg>
                     )}
-                    <span>{agentList().length === 0 ? "Loading agents..." : "Create Session"}</span>
+                    <span>Create Session</span>
                   </div>
-                  <kbd class="kbd ml-2">
-                    Cmd+Enter
-                  </kbd>
+                  <Kbd shortcut={newSessionShortcutString()} class="ml-2" />
                 </button>
               </div>
             </div>
@@ -312,10 +302,7 @@ const InstanceWelcomeView: Component<InstanceWelcomeViewProps> = (props) => {
             <kbd class="kbd">Enter</kbd>
             <span>Resume</span>
           </div>
-          <div class="flex items-center gap-1.5">
-            <kbd class="kbd">Cmd+Enter</kbd>
-            <span>New Session</span>
-          </div>
+          <KeyboardHint shortcuts={[newSessionShortcut()]} separator="" />
         </div>
       </div>
     </div>

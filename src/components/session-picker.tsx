@@ -21,7 +21,12 @@ const SessionPicker: Component<SessionPickerProps> = (props) => {
 
   createEffect(() => {
     const list = agentList()
-    if (list.length > 0 && !selectedAgent()) {
+    if (list.length === 0) {
+      setSelectedAgent("")
+      return
+    }
+    const current = selectedAgent()
+    if (!current || !list.some((agent) => agent.name === current)) {
       setSelectedAgent(list[0].name)
     }
   })

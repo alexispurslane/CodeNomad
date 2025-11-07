@@ -577,10 +577,11 @@ export default function MessageStream(props: MessageStreamProps) {
           <div class="empty-state">
             <div class="empty-state-content">
               <h3>Start a conversation</h3>
-              <p>Type a message below or try:</p>
+              <p>Type a message below or open the Command Palette:</p>
               <ul>
                 <li>
-                  <code>/init-project</code>
+                  <span>Command Palette</span>
+                  <Kbd shortcut="cmd+shift+p" class="ml-2" />
                 </li>
                 <li>Ask about your codebase</li>
                 <li>

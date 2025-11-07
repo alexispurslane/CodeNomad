@@ -52,6 +52,8 @@ export class FileStorage {
         preferences: {
           showThinkingBlocks: false,
           environmentVariables: {},
+          modelRecents: [],
+          agentModelSelections: {},
         },
         recentFolders: [],
         opencodeBinaries: [],

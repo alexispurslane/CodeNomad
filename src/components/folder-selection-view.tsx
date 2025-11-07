@@ -3,6 +3,7 @@ import { Folder, Clock, Trash2, FolderPlus, Settings, ChevronDown, ChevronUp } f
 import { recentFolders, removeRecentFolder, preferences, updateLastUsedBinary } from "../stores/preferences"
 import OpenCodeBinarySelector from "./opencode-binary-selector"
 import EnvironmentVariablesEditor from "./environment-variables-editor"
+import Kbd from "./kbd"
 
 interface FolderSelectionViewProps {
   onSelectFolder: (folder?: string, binaryPath?: string) => void
@@ -14,34 +15,37 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
   const [focusMode, setFocusMode] = createSignal<"recent" | "new" | null>("recent")
   const [showAdvanced, setShowAdvanced] = createSignal(false)
   const [selectedBinary, setSelectedBinary] = createSignal(preferences().lastUsedBinary || "opencode")
-
+  let recentListRef: HTMLDivElement | undefined
+ 
   const folders = () => recentFolders()
-
+ 
   // Update selected binary when preferences change
   createEffect(() => {
-    const lastUsed = preferences().lastUsedBinary
-    if (lastUsed && lastUsed !== selectedBinary()) {
-      setSelectedBinary(lastUsed)
-    }
-  })
-
+     const lastUsed = preferences().lastUsedBinary
+     if (lastUsed && lastUsed !== selectedBinary()) {
+       setSelectedBinary(lastUsed)
+     }
+   })
+ 
   function scrollToIndex(index: number) {
-    const element = document.querySelector(`[data-folder-index="${index}"]`)
+    const element = recentListRef?.querySelector(`[data-folder-index="${index}"]`)
     if (element) {
       element.scrollIntoView({ block: "nearest", behavior: "auto" })
     }
   }
 
+
   function handleKeyDown(e: KeyboardEvent) {
     const folderList = folders()
-
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+ 
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault()
       handleBrowse()
       return
     }
-
+ 
     if (folderList.length === 0) return
+
 
     if (e.key === "ArrowDown") {
       e.preventDefault()
@@ -154,21 +158,22 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
   }
 
   return (
-    <div class="flex h-full w-full items-center justify-center" style="background-color: var(--surface-secondary)">
-      <div class="w-full max-w-3xl px-8 py-12">
-        <div class="mb-8 text-center">
-          <div class="mb-4 flex justify-center">
+    <div class="flex h-screen w-full items-start justify-center overflow-hidden py-6" style="background-color: var(--surface-secondary)">
+      <div class="w-full max-w-3xl h-full max-h-[90vh] px-8 flex flex-col overflow-hidden">
+        <div class="mb-6 text-center shrink-0">
+          <div class="mb-3 flex justify-center">
             <Folder class="h-16 w-16 icon-muted" />
           </div>
           <h1 class="mb-2 text-2xl font-semibold text-primary">Welcome to OpenCode</h1>
           <p class="text-base text-secondary">Select a folder to start coding with AI</p>
         </div>
+ 
+        <div class="space-y-4 flex-1 min-h-0 overflow-hidden flex flex-col">
 
-        <div class="space-y-4 overflow-visible">
           <Show
             when={folders().length > 0}
             fallback={
-              <div class="panel panel-empty-state">
+              <div class="panel panel-empty-state flex-1">
                 <div class="panel-empty-state-icon">
                   <Clock class="w-12 h-12 mx-auto" />
                 </div>
@@ -177,22 +182,27 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
               </div>
             }
           >
-            <div class="panel">
-              <div class="panel-header">
-                <h2 class="panel-title">Recent Folders</h2>
-                <p class="panel-subtitle">
-                  {folders().length} {folders().length === 1 ? "folder" : "folders"} available
-                </p>
-              </div>
-              <div class="panel-list">
-                <For each={folders()}>
-                  {(folder, index) => (
-                    <div 
-                      class="panel-list-item"
-                      classList={{
-                        "panel-list-item-highlight": focusMode() === "recent" && selectedIndex() === index(),
-                      }}
-                    >
+              <div class="panel flex-1 min-h-0 overflow-hidden">
+               <div class="panel-header">
+                 <h2 class="panel-title">Recent Folders</h2>
+                 <p class="panel-subtitle">
+                   {folders().length} {folders().length === 1 ? "folder" : "folders"} available
+                 </p>
+               </div>
+               <div
+                 class="panel-list max-h-[50vh] overflow-y-auto pr-1"
+                 ref={(el) => (recentListRef = el)}
+               >
+                 <For each={folders()}>
+                   {(folder, index) => (
+                     <div
+                       data-folder-index={index()}
+                       class="panel-list-item"
+                       classList={{
+                         "panel-list-item-highlight": focusMode() === "recent" && selectedIndex() === index(),
+                       }}
+                     >
+
                       <div class="flex items-center w-full">
                         <button
                           class="panel-list-item-content w-full"
@@ -237,7 +247,7 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
             </div>
           </Show>
 
-          <div class="panel">
+          <div class="panel shrink-0">
             <div class="panel-header">
               <h2 class="panel-title">Browse for Folder</h2>
               <p class="panel-subtitle">Select any folder on your computer</p>
@@ -254,9 +264,7 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
                   <FolderPlus class="w-4 h-4" />
                   <span>{props.isLoading ? "Opening..." : "Browse Folders"}</span>
                 </div>
-                <kbd class="kbd ml-2">
-                  Cmd+Enter
-                </kbd>
+                <Kbd shortcut="cmd+n" class="ml-2" />
               </button>
             </div>
 
@@ -297,7 +305,7 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
           </div>
         </div>
 
-        <div class="mt-6 panel panel-footer">
+        <div class="mt-4 panel panel-footer shrink-0">
           <div class="panel-footer-hints">
             <Show when={folders().length > 0}>
               <div class="flex items-center gap-1.5">
@@ -315,7 +323,7 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
               </div>
             </Show>
             <div class="flex items-center gap-1.5">
-              <kbd class="kbd">Cmd+Enter</kbd>
+              <Kbd shortcut="cmd+n" />
               <span>Browse</span>
             </div>
           </div>

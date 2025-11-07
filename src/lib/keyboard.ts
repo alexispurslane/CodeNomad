@@ -1,5 +1,7 @@
 import { instances, activeInstanceId, setActiveInstanceId } from "../stores/instances"
 import { activeSessionId, setActiveSession, getSessions, activeParentSessionId } from "../stores/sessions"
+import { keyboardRegistry } from "./keyboard-registry"
+import { isMac } from "./keyboard-utils"
 
 export function setupTabKeyboardShortcuts(
   handleNewInstance: () => void,
@@ -8,6 +10,22 @@ export function setupTabKeyboardShortcuts(
   handleCloseSession: (instanceId: string, sessionId: string) => void,
   handleCommandPalette: () => void,
 ) {
+  keyboardRegistry.register({
+    id: "session-new",
+    key: "n",
+    modifiers: {
+      shift: true,
+      meta: isMac(),
+      ctrl: !isMac(),
+    },
+    handler: () => {
+      const instanceId = activeInstanceId()
+      if (instanceId) void handleNewSession(instanceId)
+    },
+    description: "New Session",
+    context: "global",
+  })
+
   window.addEventListener("keydown", (e) => {
     if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "p") {
       e.preventDefault()
@@ -45,14 +63,6 @@ export function setupTabKeyboardShortcuts(
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "n") {
       e.preventDefault()
       handleNewInstance()
-    }
-
-    if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "n") {
-      e.preventDefault()
-      const instanceId = activeInstanceId()
-      if (instanceId) {
-        handleNewSession(instanceId)
-      }
     }
 
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "w") {

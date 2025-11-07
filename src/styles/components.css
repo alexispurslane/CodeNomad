@@ -1526,6 +1526,11 @@ button.button-primary {
   @apply max-h-[400px] overflow-y-auto;
 }
 
+.panel-list--fill {
+  max-height: none;
+  height: 100%;
+}
+
 .panel-list-item {
   @apply border-b last:border-b-0 transition-colors w-full;
   border-color: var(--border-base);
