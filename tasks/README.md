@@ -1,6 +1,6 @@
 # Task Management
 
-This directory contains the task breakdown for building the OpenCode Client.
+This directory contains the task breakdown for building CodeNomad.
 
 ## Structure
 

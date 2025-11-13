@@ -2,7 +2,7 @@
 
 ## Overview
 
-The OpenCode Client interface consists of a two-level tabbed layout with instance tabs at the top and session tabs below. Each session displays a message stream and prompt input.
+The CodeNomad interface consists of a two-level tabbed layout with instance tabs at the top and session tabs below. Each session displays a message stream and prompt input.
 
 ## Layout Structure
 
@@ -346,7 +346,7 @@ Appears when instance starts:
 │                                          │
 │           [Folder Icon]                  │
 │                                          │
-│     Welcome to OpenCode Client           │
+│        Start Coding with AI        │
 │                                          │
 │  Select a folder to start coding with AI │
 │                                          │

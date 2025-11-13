@@ -7,7 +7,7 @@ export function createApplicationMenu(mainWindow: BrowserWindow) {
     ...(isMac
       ? [
           {
-            label: "OpenCode Client",
+            label: "CodeNomad",
             submenu: [
               { role: "about" as const },
               { type: "separator" as const },

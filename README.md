@@ -1,10 +1,10 @@
-# OpenCode Client
+# CodeNomad
 
 A cross-platform desktop application for interacting with OpenCode servers, built with Electron and SolidJS.
 
 ## Overview
 
-OpenCode Client provides a multi-instance, multi-session interface for working with AI-powered coding assistants. It manages OpenCode server processes, handles real-time message streaming, and provides an intuitive UI for coding with AI.
+CodeNomad provides a multi-instance, multi-session interface for working with AI-powered coding assistants. It manages OpenCode server processes, handles real-time message streaming, and provides an intuitive UI for coding with AI.
 
 **🎯 MVP Focus:** This project prioritizes functionality over performance. Performance optimization is intentionally deferred to post-MVP phases. See [docs/MVP-PRINCIPLES.md](docs/MVP-PRINCIPLES.md) for details.
 

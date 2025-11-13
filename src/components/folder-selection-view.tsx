@@ -4,6 +4,8 @@ import { recentFolders, removeRecentFolder, preferences, updateLastUsedBinary } 
 import AdvancedSettingsModal from "./advanced-settings-modal"
 import Kbd from "./kbd"
 
+const codeNomadLogo = new URL("../../images/CodeNomad-Icon.png", import.meta.url).href
+
 interface FolderSelectionViewProps {
   onSelectFolder: (folder?: string, binaryPath?: string) => void
   isLoading?: boolean
@@ -202,171 +204,169 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
         class="flex h-screen w-full items-start justify-center overflow-hidden py-6 relative"
         style="background-color: var(--surface-secondary)"
       >
-      <div
-        class="w-full max-w-3xl h-full max-h-[90vh] px-8 flex flex-col overflow-hidden"
-        aria-busy={isLoading() ? "true" : "false"}
-      >
+        <div
+          class="w-full max-w-3xl h-full px-8 pb-2 flex flex-col overflow-hidden"
+          aria-busy={isLoading() ? "true" : "false"}
+        >
         <div class="mb-6 text-center shrink-0">
           <div class="mb-3 flex justify-center">
-            <Folder class="h-16 w-16 icon-muted" />
+            <img src={codeNomadLogo} alt="CodeNomad logo" class="h-48 w-auto" loading="lazy" />
           </div>
-          <h1 class="mb-2 text-2xl font-semibold text-primary">Welcome to OpenCode</h1>
+          <h1 class="mb-2 text-3xl font-semibold text-primary">CodeNomad</h1>
           <p class="text-base text-secondary">Select a folder to start coding with AI</p>
         </div>
+
  
-        <div class="space-y-4 flex-1 min-h-0 overflow-hidden flex flex-col">
+          <div class="space-y-4 flex-1 min-h-0 overflow-hidden flex flex-col">
 
-          <Show
-            when={folders().length > 0}
-            fallback={
-              <div class="panel panel-empty-state flex-1">
-                <div class="panel-empty-state-icon">
-                  <Clock class="w-12 h-12 mx-auto" />
+            <Show
+              when={folders().length > 0}
+              fallback={
+                <div class="panel panel-empty-state flex-1">
+                  <div class="panel-empty-state-icon">
+                    <Clock class="w-12 h-12 mx-auto" />
+                  </div>
+                  <p class="panel-empty-state-title">No Recent Folders</p>
+                  <p class="panel-empty-state-description">Browse for a folder to get started</p>
                 </div>
-                <p class="panel-empty-state-title">No Recent Folders</p>
-                <p class="panel-empty-state-description">Browse for a folder to get started</p>
-              </div>
-            }
-          >
-            <div class="panel flex flex-col flex-1 min-h-0">
-              <div class="panel-header">
-                <h2 class="panel-title">Recent Folders</h2>
-                <p class="panel-subtitle">
-                  {folders().length} {folders().length === 1 ? "folder" : "folders"} available
-                </p>
-              </div>
-              <div class="panel-list panel-list--fill flex-1 min-h-0 overflow-auto" ref={(el) => (recentListRef = el)}>
-                <For each={folders()}>
-                  {(folder, index) => (
-                    <div
-                      class="panel-list-item"
-                      classList={{
-                        "panel-list-item-highlight": focusMode() === "recent" && selectedIndex() === index(),
-                        "panel-list-item-disabled": isLoading(),
-                      }}
-                    >
-                      <div class="flex items-center gap-2 w-full px-1">
-                        <button
-                          data-folder-index={index()}
-                          class="panel-list-item-content flex-1"
-                          disabled={isLoading()}
-                          onClick={() => handleFolderSelect(folder.path)}
-                          onMouseEnter={() => {
-                            if (isLoading()) return
-                            setFocusMode("recent")
-                            setSelectedIndex(index())
-                          }}
-                        >
-                          <div class="flex items-center justify-between gap-3 w-full">
-                            <div class="flex-1 min-w-0">
-                              <div class="flex items-center gap-2 mb-1">
-                                <Folder class="w-4 h-4 flex-shrink-0 icon-muted" />
-                                <span class="text-sm font-medium truncate text-primary">
-                                  {folder.path.split("/").pop()}
-                                </span>
+              }
+            >
+              <div class="panel flex flex-col flex-1 min-h-0">
+                <div class="panel-header">
+                  <h2 class="panel-title">Recent Folders</h2>
+                  <p class="panel-subtitle">
+                    {folders().length} {folders().length === 1 ? "folder" : "folders"} available
+                  </p>
+                </div>
+                <div class="panel-list panel-list--fill flex-1 min-h-0 overflow-auto" ref={(el) => (recentListRef = el)}>
+                  <For each={folders()}>
+                    {(folder, index) => (
+                      <div
+                        class="panel-list-item"
+                        classList={{
+                          "panel-list-item-highlight": focusMode() === "recent" && selectedIndex() === index(),
+                          "panel-list-item-disabled": isLoading(),
+                        }}
+                      >
+                        <div class="flex items-center gap-2 w-full px-1">
+                          <button
+                            data-folder-index={index()}
+                            class="panel-list-item-content flex-1"
+                            disabled={isLoading()}
+                            onClick={() => handleFolderSelect(folder.path)}
+                            onMouseEnter={() => {
+                              if (isLoading()) return
+                              setFocusMode("recent")
+                              setSelectedIndex(index())
+                            }}
+                          >
+                            <div class="flex items-center justify-between gap-3 w-full">
+                              <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                  <Folder class="w-4 h-4 flex-shrink-0 icon-muted" />
+                                  <span class="text-sm font-medium truncate text-primary">
+                                    {folder.path.split("/").pop()}
+                                  </span>
+                                </div>
+                                <div class="text-xs font-mono truncate pl-6 text-muted">
+                                  {getDisplayPath(folder.path)}
+                                </div>
+                                <div class="text-xs mt-1 pl-6 text-muted">
+                                  {formatRelativeTime(folder.lastAccessed)}
+                                </div>
                               </div>
-                              <div class="text-xs font-mono truncate pl-6 text-muted">
-                                {getDisplayPath(folder.path)}
-                              </div>
-                              <div class="text-xs mt-1 pl-6 text-muted">
-                                {formatRelativeTime(folder.lastAccessed)}
-                              </div>
+                              <Show when={focusMode() === "recent" && selectedIndex() === index()}>
+                                <kbd class="kbd">↵</kbd>
+                              </Show>
                             </div>
-                            <Show when={focusMode() === "recent" && selectedIndex() === index()}>
-                              <kbd class="kbd">↵</kbd>
-                            </Show>
-                          </div>
-                        </button>
-                        <button
-                          onClick={(e) => handleRemove(folder.path, e)}
-                          disabled={isLoading()}
-                          class="p-2 transition-all hover:bg-red-100 dark:hover:bg-red-900/30 opacity-70 hover:opacity-100 rounded"
-                          title="Remove from recent"
-                        >
-                          <Trash2 class="w-3.5 h-3.5 transition-colors icon-muted hover:text-red-600 dark:hover:text-red-400" />
-                        </button>
+                          </button>
+                          <button
+                            onClick={(e) => handleRemove(folder.path, e)}
+                            disabled={isLoading()}
+                            class="p-2 transition-all hover:bg-red-100 dark:hover:bg-red-900/30 opacity-70 hover:opacity-100 rounded"
+                            title="Remove from recent"
+                          >
+                            <Trash2 class="w-3.5 h-3.5 transition-colors icon-muted hover:text-red-600 dark:hover:text-red-400" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </For>
-              </div>
-            </div>
-          </Show>
-
-          <div class="panel shrink-0">
-            <div class="panel-header">
-              <h2 class="panel-title">Browse for Folder</h2>
-              <p class="panel-subtitle">Select any folder on your computer</p>
-            </div>
-
-            <div class="panel-body">
-              <button
-                onClick={handleBrowse}
-                disabled={props.isLoading}
-                class="button-primary w-full flex items-center justify-center text-sm disabled:cursor-not-allowed"
-                onMouseEnter={() => setFocusMode("new")}
-              >
-                <div class="flex items-center gap-2">
-                  <FolderPlus class="w-4 h-4" />
-                  <span>{props.isLoading ? "Opening..." : "Browse Folders"}</span>
+                    )}
+                  </For>
                 </div>
-                <Kbd shortcut="cmd+n" class="ml-2" />
-              </button>
-            </div>
-
-            {/* Advanced settings section */}
-            <div class="panel-section w-full">
-              <button
-                onClick={() => setIsAdvancedModalOpen(true)}
-                class="panel-section-header w-full justify-between"
-              >
-                <div class="flex items-center gap-2">
-                  <Settings class="w-4 h-4 icon-muted" />
-                  <span class="text-sm font-medium text-secondary">Advanced Settings</span>
-                </div>
-                <ChevronRight class="w-4 h-4 icon-muted" />
-              </button>
-              <div class="panel-section-content text-sm text-muted">
-                Configure the OpenCode binary and environment variables.
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="mt-4 panel panel-footer shrink-0">
-          <div class="panel-footer-hints">
-            <Show when={folders().length > 0}>
-              <div class="flex items-center gap-1.5">
-                <kbd class="kbd">↑</kbd>
-                <kbd class="kbd">↓</kbd>
-                <span>Navigate</span>
-              </div>
-              <div class="flex items-center gap-1.5">
-                <kbd class="kbd">Enter</kbd>
-                <span>Select</span>
-              </div>
-              <div class="flex items-center gap-1.5">
-                <kbd class="kbd">Del</kbd>
-                <span>Remove</span>
               </div>
             </Show>
-            <div class="flex items-center gap-1.5">
-              <Kbd shortcut="cmd+n" />
-              <span>Browse</span>
+
+            <div class="panel shrink-0">
+              <div class="panel-header">
+                <h2 class="panel-title">Browse for Folder</h2>
+                <p class="panel-subtitle">Select any folder on your computer</p>
+              </div>
+
+              <div class="panel-body">
+                <button
+                  onClick={handleBrowse}
+                  disabled={props.isLoading}
+                  class="button-primary w-full flex items-center justify-center text-sm disabled:cursor-not-allowed"
+                  onMouseEnter={() => setFocusMode("new")}
+                >
+                  <div class="flex items-center gap-2">
+                    <FolderPlus class="w-4 h-4" />
+                    <span>{props.isLoading ? "Opening..." : "Browse Folders"}</span>
+                  </div>
+                  <Kbd shortcut="cmd+n" class="ml-2" />
+                </button>
+              </div>
+
+              {/* Advanced settings section */}
+              <div class="panel-section w-full">
+                <button
+                  onClick={() => setIsAdvancedModalOpen(true)}
+                  class="panel-section-header w-full justify-between"
+                >
+                  <div class="flex items-center gap-2">
+                    <Settings class="w-4 h-4 icon-muted" />
+                    <span class="text-sm font-medium text-secondary">Advanced Settings</span>
+                  </div>
+                  <ChevronRight class="w-4 h-4 icon-muted" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-1 panel panel-footer shrink-0">
+            <div class="panel-footer-hints">
+              <Show when={folders().length > 0}>
+                <div class="flex items-center gap-1.5">
+                  <kbd class="kbd">↑</kbd>
+                  <kbd class="kbd">↓</kbd>
+                  <span>Navigate</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <kbd class="kbd">Enter</kbd>
+                  <span>Select</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <kbd class="kbd">Del</kbd>
+                  <span>Remove</span>
+                </div>
+              </Show>
+              <div class="flex items-center gap-1.5">
+                <Kbd shortcut="cmd+n" />
+                <span>Browse</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <Show when={isLoading()}>
-        <div class="folder-loading-overlay">
-          <div class="folder-loading-indicator">
-            <div class="spinner" />
-            <p class="folder-loading-text">Starting instance…</p>
-            <p class="folder-loading-subtext">Hang tight while we prepare your workspace.</p>
+        <Show when={isLoading()}>
+          <div class="folder-loading-overlay">
+            <div class="folder-loading-indicator">
+              <div class="spinner" />
+              <p class="folder-loading-text">Starting instance…</p>
+              <p class="folder-loading-subtext">Hang tight while we prepare your workspace.</p>
+            </div>
           </div>
-        </div>
-      </Show>
-    </div>
+        </Show>
+      </div>
 
       <AdvancedSettingsModal
         open={isAdvancedModalOpen()}

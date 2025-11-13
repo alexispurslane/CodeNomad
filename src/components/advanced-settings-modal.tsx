@@ -20,9 +20,6 @@ const AdvancedSettingsModal: Component<AdvancedSettingsModalProps> = (props) => 
           <Dialog.Content class="modal-surface w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden">
             <header class="px-6 py-4 border-b" style={{ "border-color": "var(--border-base)" }}>
               <Dialog.Title class="text-xl font-semibold text-primary">Advanced Settings</Dialog.Title>
-              <Dialog.Description class="text-sm text-secondary mt-1">
-                Configure the OpenCode binary and environment variables used when launching new instances.
-              </Dialog.Description>
             </header>
 
             <div class="flex-1 overflow-y-auto p-6 space-y-6">

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeTheme, session } from "electron"
+import { app, BrowserWindow, dialog, ipcMain, nativeImage, nativeTheme, session } from "electron"
 import { join } from "path"
 import { createApplicationMenu } from "./menu"
 import { setupInstanceIPC } from "./ipc"
@@ -15,9 +15,18 @@ setupStorageIPC()
 
 let mainWindow: BrowserWindow | null = null
 
+function getIconPath() {
+  if (app.isPackaged) {
+    return join(process.resourcesPath, "icon.png")
+  }
+
+  return join(app.getAppPath(), "electron/resources/icon.png")
+}
+
 function createWindow() {
   const prefersDark = true //nativeTheme.shouldUseDarkColors
   const backgroundColor = prefersDark ? "#1a1a1a" : "#ffffff"
+  const iconPath = getIconPath()
 
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -25,6 +34,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     backgroundColor,
+    icon: iconPath,
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -65,6 +75,13 @@ app.whenReady().then(() => {
     app.on("browser-window-created", (_, window) => {
       window.webContents.session.setSpellCheckerEnabled(false)
     })
+
+    if (app.dock) {
+      const dockIcon = nativeImage.createFromPath(getIconPath())
+      if (!dockIcon.isEmpty()) {
+        app.dock.setIcon(dockIcon)
+      }
+    }
   }
 
   console.log("[spellcheck] default session enabled:", session.defaultSession.isSpellCheckerEnabled())

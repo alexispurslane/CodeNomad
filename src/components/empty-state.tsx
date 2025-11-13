@@ -1,5 +1,7 @@
 import { Component } from "solid-js"
-import { Folder, Loader2 } from "lucide-solid"
+import { Loader2 } from "lucide-solid"
+
+const codeNomadIcon = new URL("../../images/CodeNomad-Icon.png", import.meta.url).href
 
 interface EmptyStateProps {
   onSelectFolder: () => void
@@ -11,12 +13,12 @@ const EmptyState: Component<EmptyStateProps> = (props) => {
     <div class="flex h-full w-full items-center justify-center bg-surface-secondary">
       <div class="max-w-[500px] px-8 py-12 text-center">
         <div class="mb-8 flex justify-center">
-          <Folder class="h-16 w-16 icon-muted" />
+          <img src={codeNomadIcon} alt="CodeNomad logo" class="h-24 w-auto" loading="lazy" />
         </div>
 
-        <h1 class="mb-4 text-2xl font-semibold text-primary">Welcome to OpenCode Client</h1>
-
+        <h1 class="mb-3 text-3xl font-semibold text-primary">CodeNomad</h1>
         <p class="mb-8 text-base text-secondary">Select a folder to start coding with AI</p>
+
 
         <button
           onClick={props.onSelectFolder}

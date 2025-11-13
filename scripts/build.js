@@ -111,7 +111,7 @@ const platform = process.argv[2] || "mac"
 
 console.log(`
 ╔════════════════════════════════════════╗
-║   OpenCode Client - Binary Builder    ║
+║   CodeNomad - Binary Builder          ║
 ╚════════════════════════════════════════╝
 `)
 

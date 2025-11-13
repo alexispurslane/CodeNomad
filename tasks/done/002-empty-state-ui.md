@@ -30,7 +30,6 @@ Create the initial empty state interface that appears when no instances are runn
 
 - Centered container
 - Large folder icon (from lucide-solid)
-- Heading: "Welcome to OpenCode Client"
 - Subheading: "Select a folder to start coding with AI"
 - Primary button: "Select Folder"
 - Helper text: "Keyboard shortcut: Cmd/Ctrl+N"

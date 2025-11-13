@@ -1,7 +1,7 @@
 {
   "name": "@opencode-ai/client",
   "version": "0.1.0",
-  "description": "OpenCode desktop client - multi-instance, multi-session AI coding interface",
+  "description": "CodeNomad desktop client - multi-instance, multi-session AI coding interface",
   "author": "OpenCode Team",
   "type": "module",
   "main": "dist/main/main.js",
@@ -41,6 +41,8 @@
     "@tsconfig/bun": "^1.0.9",
     "autoprefixer": "10.4.21",
     "electron": "39.0.0",
+    "png2icons": "^2.0.1",
+    "pngjs": "^7.0.0",
     "electron-builder": "^24.0.0",
     "electron-vite": "4.0.1",
     "postcss": "8.5.6",
@@ -51,7 +53,7 @@
   },
   "build": {
     "appId": "ai.opencode.client",
-    "productName": "OpenCode Client",
+    "productName": "CodeNomad",
     "directories": {
       "output": "release",
       "buildResources": "electron/resources"
