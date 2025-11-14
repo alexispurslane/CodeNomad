@@ -4,7 +4,7 @@ Desktop client for running multi-session OpenCode agents on macOS, Windows, and 
 
 ## Requirements
 
-- [OpenCode CLI](https://opencode.ai) installed and available in your `PATH`. 
+- [OpenCode CLI](https://opencode.ai) installed and available in your `PATH` or select binary in Advanced Settings
 
 ## Downloads
 
