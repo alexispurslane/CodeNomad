@@ -113,12 +113,14 @@ jobs:
         run: npm run build:win
 
       - name: Upload release assets
-        shell: bash
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ needs.prepare-release.outputs.tag }}
         run: |
-          gh release upload "$TAG" release/* --clobber
+          Get-ChildItem -Path "release" -File -Recurse | ForEach-Object {
+            gh release upload $env:TAG $_.FullName --clobber
+          }
 
   build-linux:
     needs: prepare-release
