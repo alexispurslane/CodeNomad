@@ -35,7 +35,7 @@ export class ConfigStore {
         this.logger.debug({ resolved }, "Loaded existing config file")
       } else {
         this.cache = DEFAULT_CONFIG
-        this.logger.info({ resolved }, "No config file found, using defaults")
+        this.logger.debug({ resolved }, "No config file found, using defaults")
       }
     } catch (error) {
       this.logger.warn({ err: error }, "Failed to load config, using defaults")
@@ -59,7 +59,7 @@ export class ConfigStore {
     this.cache = ConfigFileSchema.parse(merged)
     this.persist()
     this.eventBus?.publish({ type: "config.appChanged", config: this.cache })
-    this.logger.info("Config updated")
+    this.logger.debug("Config updated")
   }
 
   private mergeConfig(current: ConfigFile, partial: ConfigFile | ConfigFileUpdate): ConfigFile {

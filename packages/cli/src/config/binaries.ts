@@ -30,7 +30,7 @@ export class BinaryRegistry {
   }
 
   create(request: BinaryCreateRequest): BinaryRecord {
-    this.logger.info({ path: request.path }, "Registering OpenCode binary")
+    this.logger.debug({ path: request.path }, "Registering OpenCode binary")
     const entry = {
       path: request.path,
       version: undefined,
@@ -56,7 +56,7 @@ export class BinaryRegistry {
   }
 
   update(id: string, updates: BinaryUpdateRequest): BinaryRecord {
-    this.logger.info({ id }, "Updating OpenCode binary")
+    this.logger.debug({ id }, "Updating OpenCode binary")
     const config = this.configStore.get()
     const updatedEntries = config.opencodeBinaries.map((binary) =>
       binary.path === id ? { ...binary, label: updates.label ?? binary.label } : binary,
@@ -77,7 +77,7 @@ export class BinaryRegistry {
   }
 
   remove(id: string) {
-    this.logger.info({ id }, "Removing OpenCode binary")
+    this.logger.debug({ id }, "Removing OpenCode binary")
     const config = this.configStore.get()
     const remaining = config.opencodeBinaries.filter((binary) => binary.path !== id)
     const update: ConfigFileUpdate = { opencodeBinaries: remaining }

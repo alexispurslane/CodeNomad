@@ -2,6 +2,8 @@
  * CLI entry point.
  * For now this only wires the typed modules together; actual command handling comes later.
  */
+import { Command, InvalidArgumentError, Option } from "commander"
+import packageJson from "../package.json"
 import { createHttpServer } from "./server/http-server"
 import { WorkspaceManager } from "./workspaces/manager"
 import { ConfigStore } from "./config/store"
@@ -21,42 +23,68 @@ interface CliOptions {
   logDestination?: string
 }
 
+const DEFAULT_PORT = 9898
+const DEFAULT_HOST = "127.0.0.1"
+const DEFAULT_CONFIG_PATH = "~/.config/codenomad/config.json"
+
 function parseCliOptions(argv: string[]): CliOptions {
-  // TODO: replace with commander/yargs; this is placeholder logic.
-  const args = new Map<string, string>()
-  for (let i = 0; i < argv.length; i += 2) {
-    const key = argv[i]
-    const value = argv[i + 1]
-    if (key && key.startsWith("--") && value) {
-      args.set(key.slice(2), value)
-    }
-  }
+  const program = new Command()
+    .name("codenomad-cli")
+    .description("CodeNomad CLI server")
+    .version(packageJson.version, "-v, --version", "Show the CLI version")
+    .addOption(new Option("--host <host>", "Host interface to bind").env("CLI_HOST").default(DEFAULT_HOST))
+    .addOption(new Option("--port <number>", "Port for the HTTP server").env("CLI_PORT").default(DEFAULT_PORT).argParser(parsePort))
+    .addOption(new Option("--root <path>", "Workspace root directory").default(process.cwd()))
+    .addOption(new Option("--config <path>", "Path to the config file").env("CLI_CONFIG").default(DEFAULT_CONFIG_PATH))
+    .addOption(new Option("--log-level <level>", "Log level (trace|debug|info|warn|error)").env("CLI_LOG_LEVEL"))
+    .addOption(new Option("--log-destination <path>", "Log destination file (defaults to stdout)").env("CLI_LOG_DESTINATION"))
+
+  program.parse(argv, { from: "user" })
+  const parsed = program.opts<{
+    host: string
+    port: number
+    root: string
+    config: string
+    logLevel?: string
+    logDestination?: string
+  }>()
 
   return {
-    port: Number(args.get("port") ?? process.env.CLI_PORT ?? 5777),
-    host: args.get("host") ?? process.env.CLI_HOST ?? "127.0.0.1",
-    rootDir: args.get("root") ?? process.cwd(),
-    configPath: args.get("config") ?? process.env.CLI_CONFIG ?? "~/.config/codenomad/config.json",
-    logLevel: args.get("log-level") ?? process.env.CLI_LOG_LEVEL,
-    logDestination: args.get("log-destination") ?? process.env.CLI_LOG_DESTINATION,
+    port: parsed.port,
+    host: parsed.host,
+    rootDir: parsed.root,
+    configPath: parsed.config,
+    logLevel: parsed.logLevel,
+    logDestination: parsed.logDestination,
   }
+}
+
+function parsePort(input: string): number {
+  const value = Number(input)
+  if (!Number.isInteger(value) || value < 1 || value > 65535) {
+    throw new InvalidArgumentError("Port must be an integer between 1 and 65535")
+  }
+  return value
 }
 
 async function main() {
   const options = parseCliOptions(process.argv.slice(2))
-  const logger = createLogger({ level: options.logLevel, destination: options.logDestination })
+  const logger = createLogger({ level: options.logLevel, destination: options.logDestination, component: "app" })
+  const workspaceLogger = logger.child({ component: "workspace" })
+  const configLogger = logger.child({ component: "config" })
+  const eventLogger = logger.child({ component: "events" })
 
   logger.info({ options }, "Starting CodeNomad CLI server")
 
-  const eventBus = new EventBus(logger)
-  const configStore = new ConfigStore(options.configPath, eventBus, logger)
-  const binaryRegistry = new BinaryRegistry(configStore, eventBus, logger)
+  const eventBus = new EventBus(eventLogger)
+  const configStore = new ConfigStore(options.configPath, eventBus, configLogger)
+  const binaryRegistry = new BinaryRegistry(configStore, eventBus, configLogger)
   const workspaceManager = new WorkspaceManager({
     rootDir: options.rootDir,
     configStore,
     binaryRegistry,
     eventBus,
-    logger,
+    logger: workspaceLogger,
   })
   const fileSystemBrowser = new FileSystemBrowser({ rootDir: options.rootDir })
   const instanceStore = new InstanceStore()
@@ -78,8 +106,8 @@ async function main() {
     eventBus,
     serverMeta,
     instanceStore,
-    logger,
   })
+
 
   await server.start()
   logger.info({ port: options.port, host: options.host }, "HTTP server listening")
@@ -116,7 +144,7 @@ async function main() {
 }
 
 main().catch((error) => {
-  const logger = createLogger()
+  const logger = createLogger({ component: "app" })
   logger.error({ err: error }, "CLI server crashed")
   process.exit(1)
 })

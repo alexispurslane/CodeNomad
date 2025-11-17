@@ -13,7 +13,6 @@ import { registerEventRoutes } from "./routes/events"
 import { registerStorageRoutes } from "./routes/storage"
 import { ServerMeta } from "../api-types"
 import { InstanceStore } from "../storage/instance-store"
-import { Logger } from "../logger"
 
 interface HttpServerDeps {
   host: string
@@ -25,12 +24,10 @@ interface HttpServerDeps {
   eventBus: EventBus
   serverMeta: ServerMeta
   instanceStore: InstanceStore
-  logger: Logger
 }
 
 export function createHttpServer(deps: HttpServerDeps) {
-  const fastifyLogger = deps.logger.child({ module: "http" })
-  const app = Fastify({ logger: fastifyLogger as any })
+  const app = Fastify({ logger: false })
 
   const sseClients = new Set<() => void>()
   const registerSseClient = (cleanup: () => void) => {
