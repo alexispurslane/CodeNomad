@@ -2,14 +2,7 @@ import fs from "fs"
 import path from "path"
 import { EventBus } from "../events/bus"
 import { Logger } from "../logger"
-import {
-  AgentModelSelections,
-  ConfigFile,
-  ConfigFileUpdate,
-  ConfigFileSchema,
-  ConfigFileUpdateSchema,
-  DEFAULT_CONFIG,
-} from "./schema"
+import { ConfigFile, ConfigFileSchema, DEFAULT_CONFIG } from "./schema"
 
 export class ConfigStore {
   private cache: ConfigFile = DEFAULT_CONFIG
@@ -50,54 +43,18 @@ export class ConfigStore {
     return this.load()
   }
 
-  update(partial: ConfigFile | ConfigFileUpdate) {
-    const safePartial =
-      "recentFolders" in partial && "opencodeBinaries" in partial
-        ? ConfigFileSchema.parse(partial)
-        : ConfigFileUpdateSchema.parse(partial ?? {})
-    const merged = this.mergeConfig(this.load(), safePartial)
-    this.cache = ConfigFileSchema.parse(merged)
+  replace(config: ConfigFile) {
+    const validated = ConfigFileSchema.parse(config)
+    this.commit(validated)
+  }
+
+  private commit(next: ConfigFile) {
+    this.cache = next
+    this.loaded = true
     this.persist()
     this.eventBus?.publish({ type: "config.appChanged", config: this.cache })
-    this.logger.debug("Config updated")
-  }
-
-  private mergeConfig(current: ConfigFile, partial: ConfigFile | ConfigFileUpdate): ConfigFile {
-    const mergedPreferences = {
-      ...current.preferences,
-      ...partial.preferences,
-      environmentVariables: {
-        ...current.preferences.environmentVariables,
-        ...(partial.preferences?.environmentVariables ?? {}),
-      },
-      agentModelSelections: this.mergeAgentSelections(
-        current.preferences.agentModelSelections,
-        partial.preferences?.agentModelSelections,
-      ),
-    }
-
-    return {
-      ...current,
-      ...partial,
-      preferences: mergedPreferences,
-      recentFolders: partial.recentFolders ?? current.recentFolders,
-      opencodeBinaries: partial.opencodeBinaries ?? current.opencodeBinaries,
-    }
-  }
-
-  private mergeAgentSelections(base: AgentModelSelections, update?: AgentModelSelections) {
-    if (!update) {
-      return base
-    }
-
-    const result: AgentModelSelections = { ...base }
-    for (const [instanceId, agentMap] of Object.entries(update)) {
-      result[instanceId] = {
-        ...(base[instanceId] ?? {}),
-        ...agentMap,
-      }
-    }
-    return result
+    this.logger.info("Config updated")
+    this.logger.debug({ config: this.cache }, "Config payload")
   }
 
   private persist() {

@@ -1,5 +1,5 @@
-import { createContext, createSignal, useContext, onMount, createEffect, type JSX } from "solid-js"
-import { storage, type ConfigData } from "./storage"
+import { createContext, createEffect, createSignal, onMount, useContext, type JSX } from "solid-js"
+import { useConfig } from "../stores/preferences"
 
 interface ThemeContextValue {
   isDark: () => boolean
@@ -20,64 +20,30 @@ function applyTheme(dark: boolean) {
 
 export function ThemeProvider(props: { children: JSX.Element }) {
   const systemPrefersDark = window.matchMedia("(prefers-color-scheme: dark)")
-  const [isDark, setIsDarkSignal] = createSignal(true) //systemPrefersDark.matches)
-  let themePreference: "system" | "dark" | "light" = "dark"
+  const { themePreference, setThemePreference } = useConfig()
+  const [isDark, setIsDarkSignal] = createSignal(false)
 
-  applyTheme(true) //systemPrefersDark.matches)
-
-  async function loadTheme() {
-    try {
-      const config = await storage.loadConfig()
-      const savedTheme = config.theme
-      let themeDark: boolean
-
-      if (savedTheme === "system") {
-        themePreference = "system"
-        themeDark = systemPrefersDark.matches
-      } else if (savedTheme === "dark") {
-        themePreference = "dark"
-        themeDark = true
-      } else if (savedTheme === "light") {
-        themePreference = "light"
-        themeDark = false
-      } else {
-        themePreference = "dark"
-        themeDark = true
-      }
-
-      setIsDarkSignal(themeDark)
-      applyTheme(themeDark)
-    } catch (error) {
-      console.warn("Failed to load theme from config:", error)
-      themePreference = "dark"
-      const themeDark = true
-      setIsDarkSignal(themeDark)
-      applyTheme(themeDark)
+  const resolveDarkTheme = () => {
+    const preference = themePreference()
+    if (preference === "system") {
+      return systemPrefersDark.matches
     }
+    return preference === "dark"
   }
 
-  async function saveTheme(dark: boolean) {
-    try {
-      const config = await storage.loadConfig()
-      const nextPreference = dark ? "dark" : "light"
-      config.theme = nextPreference
-      themePreference = nextPreference
-      await storage.saveConfig(config)
-    } catch (error) {
-      console.warn("Failed to save theme to config:", error)
-    }
+  const applyResolvedTheme = () => {
+    const dark = resolveDarkTheme()
+    setIsDarkSignal(dark)
+    applyTheme(dark)
   }
+
+  createEffect(() => {
+    applyResolvedTheme()
+  })
 
   onMount(() => {
-    loadTheme()
-
-    const unsubscribe = storage.onConfigChanged(() => {
-      loadTheme()
-    })
-
-    // Listen for system theme changes
     const handleSystemThemeChange = (event: MediaQueryListEvent) => {
-      if (themePreference === "system") {
+      if (themePreference() === "system") {
         setIsDarkSignal(event.matches)
         applyTheme(event.matches)
       }
@@ -86,19 +52,12 @@ export function ThemeProvider(props: { children: JSX.Element }) {
     systemPrefersDark.addEventListener("change", handleSystemThemeChange)
 
     return () => {
-      unsubscribe()
       systemPrefersDark.removeEventListener("change", handleSystemThemeChange)
     }
   })
 
-  createEffect(() => {
-    applyTheme(isDark())
-  })
-
   const setTheme = (dark: boolean) => {
-    setIsDarkSignal(dark)
-    applyTheme(dark)
-    saveTheme(dark)
+    setThemePreference(dark ? "dark" : "light")
   }
 
   const toggleTheme = () => {

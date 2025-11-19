@@ -2,7 +2,7 @@ import { FastifyInstance } from "fastify"
 import { z } from "zod"
 import { ConfigStore } from "../../config/store"
 import { BinaryRegistry } from "../../config/binaries"
-import { ConfigFileSchema, ConfigFileUpdateSchema } from "../../config/schema"
+import { ConfigFileSchema } from "../../config/schema"
 
 interface RouteDeps {
   configStore: ConfigStore
@@ -29,13 +29,7 @@ export function registerConfigRoutes(app: FastifyInstance, deps: RouteDeps) {
 
   app.put("/api/config/app", async (request) => {
     const body = ConfigFileSchema.parse(request.body ?? {})
-    deps.configStore.update(body)
-    return deps.configStore.get()
-  })
-
-  app.patch("/api/config/app", async (request) => {
-    const body = ConfigFileUpdateSchema.parse(request.body ?? {})
-    deps.configStore.update(body)
+    deps.configStore.replace(body)
     return deps.configStore.get()
   })
 

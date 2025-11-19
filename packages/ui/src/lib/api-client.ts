@@ -1,6 +1,5 @@
 import type {
   AppConfig,
-  AppConfigUpdateRequest,
   BinaryCreateRequest,
   BinaryListResponse,
   BinaryUpdateRequest,
@@ -112,12 +111,6 @@ export const cliApi = {
   updateConfig(payload: AppConfig): Promise<AppConfig> {
     return request<AppConfig>("/api/config/app", {
       method: "PUT",
-      body: JSON.stringify(payload),
-    })
-  },
-  patchConfig(payload: AppConfigUpdateRequest): Promise<AppConfig> {
-    return request<AppConfig>("/api/config/app", {
-      method: "PATCH",
       body: JSON.stringify(payload),
     })
   },

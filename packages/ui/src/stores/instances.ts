@@ -15,7 +15,7 @@ import {
   clearInstanceDraftPrompts,
 } from "./sessions"
 import { fetchCommands, clearCommands } from "./commands"
-import { preferences, updateLastUsedBinary } from "./preferences"
+import { preferences } from "./preferences"
 import { computeDisplayParts } from "./session-messages"
 import { withSession, setSessionPendingPermission } from "./session-state"
 import { setHasInstances } from "./ui"
@@ -294,11 +294,7 @@ function removeInstance(id: string) {
   clearInstanceDraftPrompts(id)
 }
 
-async function createInstance(folder: string, binaryPath?: string): Promise<string> {
-  if (binaryPath) {
-    updateLastUsedBinary(binaryPath)
-  }
-
+async function createInstance(folder: string, _binaryPath?: string): Promise<string> {
   try {
     const workspace = await cliApi.createWorkspace({ path: folder })
     upsertWorkspace(workspace)

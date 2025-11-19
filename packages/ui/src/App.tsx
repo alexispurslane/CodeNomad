@@ -43,7 +43,7 @@ const App: Component = () => {
   const { isDark } = useTheme()
   const {
     preferences,
-    addRecentFolder,
+    recordWorkspaceLaunch,
     toggleShowThinkingBlocks,
     setDiffViewMode,
     setToolOutputExpansion,
@@ -92,7 +92,7 @@ const App: Component = () => {
     setIsSelectingFolder(true)
     const selectedBinary = binaryPath || preferences().lastUsedBinary || "opencode"
     try {
-      addRecentFolder(folderPath)
+      recordWorkspaceLaunch(folderPath, selectedBinary)
       clearLaunchError()
       const instanceId = await createInstance(folderPath, selectedBinary)
       setHasInstances(true)

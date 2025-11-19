@@ -6,7 +6,7 @@ import {
 } from "../api-types"
 import { ConfigStore } from "./store"
 import { EventBus } from "../events/bus"
-import type { ConfigFileUpdate } from "./schema"
+import type { ConfigFile } from "./schema"
 import { Logger } from "../logger"
 
 export class BinaryRegistry {
@@ -39,17 +39,15 @@ export class BinaryRegistry {
     }
 
     const config = this.configStore.get()
-    const deduped = config.opencodeBinaries.filter((binary) => binary.path !== request.path)
-
-    const update: ConfigFileUpdate = {
-      opencodeBinaries: [entry, ...deduped],
-    }
+    const nextConfig = this.cloneConfig(config)
+    const deduped = nextConfig.opencodeBinaries.filter((binary) => binary.path !== request.path)
+    nextConfig.opencodeBinaries = [entry, ...deduped]
 
     if (request.makeDefault) {
-      update.preferences = { lastUsedBinary: request.path }
+      nextConfig.preferences.lastUsedBinary = request.path
     }
 
-    this.configStore.update(update)
+    this.configStore.replace(nextConfig)
     const record = this.getById(request.path)
     this.emitChange()
     return record
@@ -58,19 +56,16 @@ export class BinaryRegistry {
   update(id: string, updates: BinaryUpdateRequest): BinaryRecord {
     this.logger.debug({ id }, "Updating OpenCode binary")
     const config = this.configStore.get()
-    const updatedEntries = config.opencodeBinaries.map((binary) =>
+    const nextConfig = this.cloneConfig(config)
+    nextConfig.opencodeBinaries = nextConfig.opencodeBinaries.map((binary) =>
       binary.path === id ? { ...binary, label: updates.label ?? binary.label } : binary,
     )
 
-    const update: ConfigFileUpdate = {
-      opencodeBinaries: updatedEntries,
-    }
-
     if (updates.makeDefault) {
-      update.preferences = { lastUsedBinary: id }
+      nextConfig.preferences.lastUsedBinary = id
     }
 
-    this.configStore.update(update)
+    this.configStore.replace(nextConfig)
     const record = this.getById(id)
     this.emitChange()
     return record
@@ -79,14 +74,15 @@ export class BinaryRegistry {
   remove(id: string) {
     this.logger.debug({ id }, "Removing OpenCode binary")
     const config = this.configStore.get()
-    const remaining = config.opencodeBinaries.filter((binary) => binary.path !== id)
-    const update: ConfigFileUpdate = { opencodeBinaries: remaining }
+    const nextConfig = this.cloneConfig(config)
+    const remaining = nextConfig.opencodeBinaries.filter((binary) => binary.path !== id)
+    nextConfig.opencodeBinaries = remaining
 
-    if (config.preferences.lastUsedBinary === id) {
-      update.preferences = { lastUsedBinary: remaining[0]?.path }
+    if (nextConfig.preferences.lastUsedBinary === id) {
+      nextConfig.preferences.lastUsedBinary = remaining[0]?.path
     }
 
-    this.configStore.update(update)
+    this.configStore.replace(nextConfig)
     this.emitChange()
   }
 
@@ -100,7 +96,12 @@ export class BinaryRegistry {
     })
   }
 
+  private cloneConfig(config: ConfigFile): ConfigFile {
+    return JSON.parse(JSON.stringify(config)) as ConfigFile
+  }
+
   private mapRecords(): BinaryRecord[] {
+
     const config = this.configStore.get()
     const configuredBinaries = config.opencodeBinaries.map<BinaryRecord>((binary) => ({
       id: binary.path,

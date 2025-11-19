@@ -16,7 +16,7 @@ interface FolderSelectionViewProps {
 }
 
 const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
-  const { recentFolders, removeRecentFolder, preferences, updateLastUsedBinary } = useConfig()
+  const { recentFolders, removeRecentFolder, preferences } = useConfig()
   const [selectedIndex, setSelectedIndex] = createSignal(0)
   const [focusMode, setFocusMode] = createSignal<"recent" | "new" | null>("recent")
   const [selectedBinary, setSelectedBinary] = createSignal(preferences().lastUsedBinary || "opencode")
@@ -169,7 +169,6 @@ const FolderSelectionView: Component<FolderSelectionViewProps> = (props) => {
 
   function handleFolderSelect(path: string) {
     if (isLoading()) return
-    updateLastUsedBinary(selectedBinary())
     props.onSelectFolder(path, selectedBinary())
   }
  

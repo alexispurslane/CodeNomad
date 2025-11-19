@@ -1,6 +1,14 @@
-import { createContext, createSignal, onMount, useContext } from "solid-js"
+import { createContext, createMemo, createSignal, onMount, useContext } from "solid-js"
 import type { Accessor, ParentComponent } from "solid-js"
 import { storage, type ConfigData } from "../lib/storage"
+
+type DeepReadonly<T> = T extends (...args: any[]) => unknown
+  ? T
+  : T extends Array<infer U>
+    ? ReadonlyArray<DeepReadonly<U>>
+    : T extends object
+      ? { readonly [K in keyof T]: DeepReadonly<T[K]> }
+      : T
 
 export interface ModelPreference {
   providerId: string
@@ -36,6 +44,8 @@ export interface RecentFolder {
   lastAccessed: number
 }
 
+export type ThemePreference = NonNullable<ConfigData["theme"]>
+
 const MAX_RECENT_FOLDERS = 20
 const MAX_RECENT_MODELS = 5
 
@@ -47,6 +57,18 @@ const defaultPreferences: Preferences = {
   diffViewMode: "split",
   toolOutputExpansion: "expanded",
   diagnosticsExpansion: "expanded",
+}
+
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true
+  if (typeof a === "object" && a !== null && typeof b === "object" && b !== null) {
+    try {
+      return JSON.stringify(a) === JSON.stringify(b)
+    } catch (error) {
+      console.warn("Failed to compare preference values", error)
+    }
+  }
+  return false
 }
 
 function normalizePreferences(pref?: Partial<Preferences>): Preferences {
@@ -78,73 +100,148 @@ function normalizePreferences(pref?: Partial<Preferences>): Preferences {
   }
 }
 
-const [preferences, setPreferences] = createSignal<Preferences>(normalizePreferences())
-const [recentFolders, setRecentFolders] = createSignal<RecentFolder[]>([])
-const [opencodeBinaries, setOpenCodeBinaries] = createSignal<OpenCodeBinary[]>([])
+const [internalConfig, setInternalConfig] = createSignal<ConfigData>(buildFallbackConfig())
+const config = createMemo<DeepReadonly<ConfigData>>(() => internalConfig())
 const [isConfigLoaded, setIsConfigLoaded] = createSignal(false)
-let cachedConfig: ConfigData = {
-  preferences: normalizePreferences(),
-  recentFolders: [],
-  opencodeBinaries: [],
-}
+const preferences = createMemo<Preferences>(() => internalConfig().preferences)
+const recentFolders = createMemo<RecentFolder[]>(() => internalConfig().recentFolders ?? [])
+const opencodeBinaries = createMemo<OpenCodeBinary[]>(() => internalConfig().opencodeBinaries ?? [])
+const themePreference = createMemo<ThemePreference>(() => internalConfig().theme ?? "dark")
 let loadPromise: Promise<void> | null = null
 
-async function loadConfig(): Promise<void> {
+function normalizeConfig(config?: ConfigData | null): ConfigData {
+  return {
+    preferences: normalizePreferences(config?.preferences),
+    recentFolders: (config?.recentFolders ?? []).map((folder) => ({ ...folder })),
+    opencodeBinaries: (config?.opencodeBinaries ?? []).map((binary) => ({ ...binary })),
+    theme: config?.theme ?? "dark",
+  }
+}
+
+function buildFallbackConfig(): ConfigData {
+  return normalizeConfig()
+}
+
+async function syncConfig(source?: ConfigData): Promise<void> {
   try {
-    const config = await storage.loadConfig()
-    cachedConfig = {
-      ...config,
-      preferences: normalizePreferences(config.preferences),
-      recentFolders: config.recentFolders ?? [],
-      opencodeBinaries: config.opencodeBinaries ?? [],
-    }
+    const configData = source ?? (await storage.loadConfig())
+    applyConfig(configData)
   } catch (error) {
     console.error("Failed to load config:", error)
-    cachedConfig = {
-      ...cachedConfig,
-      preferences: normalizePreferences(),
-      recentFolders: [],
-      opencodeBinaries: [],
-    }
+    applyConfig(buildFallbackConfig())
   }
+}
 
-  setPreferences(cachedConfig.preferences)
-  setRecentFolders(cachedConfig.recentFolders)
-  setOpenCodeBinaries(cachedConfig.opencodeBinaries)
+function applyConfig(next: ConfigData) {
+  setInternalConfig(normalizeConfig(next))
   setIsConfigLoaded(true)
 }
 
-async function saveConfig(): Promise<void> {
+function cloneConfigForUpdate(): ConfigData {
+  return normalizeConfig(internalConfig())
+}
+
+function logConfigDiff(previous: ConfigData, next: ConfigData) {
+  if (deepEqual(previous, next)) {
+    return
+  }
+  const changes = diffObjects(previous, next)
+  if (changes.length > 0) {
+    console.debug("[Config] Changes", changes)
+  }
+}
+
+function diffObjects(previous: unknown, next: unknown, path: string[] = []): string[] {
+  if (previous === next) {
+    return []
+  }
+
+  if (typeof previous !== "object" || previous === null || typeof next !== "object" || next === null) {
+    return [path.join(".")]
+  }
+
+  const prevKeys = Object.keys(previous as Record<string, unknown>)
+  const nextKeys = Object.keys(next as Record<string, unknown>)
+  const allKeys = new Set([...prevKeys, ...nextKeys])
+  const changes: string[] = []
+
+  for (const key of allKeys) {
+    const childPath = [...path, key]
+    const prevValue = (previous as Record<string, unknown>)[key]
+    const nextValue = (next as Record<string, unknown>)[key]
+    changes.push(...diffObjects(prevValue, nextValue, childPath))
+  }
+
+  return changes
+}
+
+function updateConfig(mutator: (draft: ConfigData) => void): void {
+  const previous = internalConfig()
+  const draft = cloneConfigForUpdate()
+  mutator(draft)
+  logConfigDiff(previous, draft)
+  applyConfig(draft)
+  void persistFullConfig(draft)
+}
+
+async function persistFullConfig(next: ConfigData): Promise<void> {
   try {
     await ensureConfigLoaded()
-    const config: ConfigData = {
-      ...cachedConfig,
-      preferences: preferences(),
-      recentFolders: recentFolders(),
-      opencodeBinaries: opencodeBinaries(),
-    }
-    cachedConfig = config
-    await storage.saveConfig(config)
+    await storage.updateConfig(next)
   } catch (error) {
     console.error("Failed to save config:", error)
+    void syncConfig().catch((syncError: unknown) => {
+      console.error("Failed to refresh config:", syncError)
+    })
   }
+}
+
+function setThemePreference(preference: ThemePreference): void {
+  if (themePreference() === preference) {
+    return
+  }
+  updateConfig((draft) => {
+    draft.theme = preference
+  })
 }
 
 async function ensureConfigLoaded(): Promise<void> {
   if (isConfigLoaded()) return
   if (!loadPromise) {
-    loadPromise = loadConfig().finally(() => {
+    loadPromise = syncConfig().finally(() => {
       loadPromise = null
     })
   }
   await loadPromise
 }
 
+function buildRecentFolderList(path: string, source: RecentFolder[]): RecentFolder[] {
+  const folders = source.filter((f) => f.path !== path)
+  folders.unshift({ path, lastAccessed: Date.now() })
+  return folders.slice(0, MAX_RECENT_FOLDERS)
+}
+
+function buildBinaryList(path: string, version: string | undefined, source: OpenCodeBinary[]): OpenCodeBinary[] {
+  const timestamp = Date.now()
+  const existing = source.find((b) => b.path === path)
+  if (existing) {
+    const updatedEntry: OpenCodeBinary = { ...existing, lastUsed: timestamp }
+    const remaining = source.filter((b) => b.path !== path)
+    return [updatedEntry, ...remaining]
+  }
+  const nextEntry: OpenCodeBinary = version ? { path, version, lastUsed: timestamp } : { path, lastUsed: timestamp }
+  return [nextEntry, ...source].slice(0, 10)
+}
 
 function updatePreferences(updates: Partial<Preferences>): void {
-  const updated = normalizePreferences({ ...preferences(), ...updates })
-  setPreferences(updated)
-  saveConfig().catch(console.error)
+  const current = internalConfig().preferences
+  const merged = normalizePreferences({ ...current, ...updates })
+  if (deepEqual(current, merged)) {
+    return
+  }
+  updateConfig((draft) => {
+    draft.preferences = merged
+  })
 }
 
 function setDiffViewMode(mode: DiffViewMode): void {
@@ -167,54 +264,44 @@ function toggleShowThinkingBlocks(): void {
 }
 
 function addRecentFolder(path: string): void {
-  const folders = recentFolders().filter((f) => f.path !== path)
-  folders.unshift({ path, lastAccessed: Date.now() })
-
-  const trimmed = folders.slice(0, MAX_RECENT_FOLDERS)
-  setRecentFolders(trimmed)
-  saveConfig().catch(console.error)
+  updateConfig((draft) => {
+    draft.recentFolders = buildRecentFolderList(path, draft.recentFolders)
+  })
 }
 
 function removeRecentFolder(path: string): void {
-  const folders = recentFolders().filter((f) => f.path !== path)
-  setRecentFolders(folders)
-  saveConfig().catch(console.error)
+  updateConfig((draft) => {
+    draft.recentFolders = draft.recentFolders.filter((f) => f.path !== path)
+  })
 }
 
 function addOpenCodeBinary(path: string, version?: string): void {
-  const binaries = opencodeBinaries().filter((b) => b.path !== path)
-  const lastUsed = Date.now()
-  const binaryEntry: OpenCodeBinary = version ? { path, version, lastUsed } : { path, lastUsed }
-  binaries.unshift(binaryEntry)
-
-  const trimmed = binaries.slice(0, 10) // Keep max 10 binaries
-  setOpenCodeBinaries(trimmed)
-  saveConfig().catch(console.error)
+  updateConfig((draft) => {
+    draft.opencodeBinaries = buildBinaryList(path, version, draft.opencodeBinaries)
+  })
 }
 
 function removeOpenCodeBinary(path: string): void {
-  const binaries = opencodeBinaries().filter((b) => b.path !== path)
-  setOpenCodeBinaries(binaries)
-  saveConfig().catch(console.error)
+  updateConfig((draft) => {
+    draft.opencodeBinaries = draft.opencodeBinaries.filter((b) => b.path !== path)
+  })
 }
 
 function updateLastUsedBinary(path: string): void {
-  updatePreferences({ lastUsedBinary: path })
+  const target = path || preferences().lastUsedBinary || "opencode"
+  updateConfig((draft) => {
+    draft.preferences = normalizePreferences({ ...draft.preferences, lastUsedBinary: target })
+    draft.opencodeBinaries = buildBinaryList(target, undefined, draft.opencodeBinaries)
+  })
+}
 
-  const binaries = opencodeBinaries()
-  let binary = binaries.find((b) => b.path === path)
-
-  // If binary not found in list, add it (for system PATH "opencode")
-  if (!binary) {
-    addOpenCodeBinary(path)
-    binary = { path, lastUsed: Date.now() }
-  } else {
-    binary.lastUsed = Date.now()
-    // Move to front
-    const sorted = [binary, ...binaries.filter((b) => b.path !== path)]
-    setOpenCodeBinaries(sorted)
-    saveConfig().catch(console.error)
-  }
+function recordWorkspaceLaunch(folderPath: string, binaryPath?: string): void {
+  updateConfig((draft) => {
+    const targetBinary = binaryPath && binaryPath.trim().length > 0 ? binaryPath : draft.preferences.lastUsedBinary || "opencode"
+    draft.recentFolders = buildRecentFolderList(folderPath, draft.recentFolders)
+    draft.preferences = normalizePreferences({ ...draft.preferences, lastUsedBinary: targetBinary })
+    draft.opencodeBinaries = buildBinaryList(targetBinary, undefined, draft.opencodeBinaries)
+  })
 }
 
 function updateEnvironmentVariables(envVars: Record<string, string>): void {
@@ -264,15 +351,19 @@ function getAgentModelPreference(instanceId: string, agent: string): ModelPrefer
   return preferences().agentModelSelections?.[instanceId]?.[agent]
 }
 
-void ensureConfigLoaded().catch((error) => {
+void ensureConfigLoaded().catch((error: unknown) => {
   console.error("Failed to initialize config:", error)
 })
 
 interface ConfigContextValue {
   isLoaded: Accessor<boolean>
+  config: typeof config
   preferences: typeof preferences
   recentFolders: typeof recentFolders
   opencodeBinaries: typeof opencodeBinaries
+  themePreference: typeof themePreference
+  setThemePreference: typeof setThemePreference
+  updateConfig: typeof updateConfig
   toggleShowThinkingBlocks: typeof toggleShowThinkingBlocks
   setDiffViewMode: typeof setDiffViewMode
   setToolOutputExpansion: typeof setToolOutputExpansion
@@ -282,6 +373,7 @@ interface ConfigContextValue {
   addOpenCodeBinary: typeof addOpenCodeBinary
   removeOpenCodeBinary: typeof removeOpenCodeBinary
   updateLastUsedBinary: typeof updateLastUsedBinary
+  recordWorkspaceLaunch: typeof recordWorkspaceLaunch
   updatePreferences: typeof updatePreferences
   updateEnvironmentVariables: typeof updateEnvironmentVariables
   addEnvironmentVariable: typeof addEnvironmentVariable
@@ -295,9 +387,13 @@ const ConfigContext = createContext<ConfigContextValue>()
 
 const configContextValue: ConfigContextValue = {
   isLoaded: isConfigLoaded,
+  config,
   preferences,
   recentFolders,
   opencodeBinaries,
+  themePreference,
+  setThemePreference,
+  updateConfig,
   toggleShowThinkingBlocks,
   setDiffViewMode,
   setToolOutputExpansion,
@@ -307,6 +403,7 @@ const configContextValue: ConfigContextValue = {
   addOpenCodeBinary,
   removeOpenCodeBinary,
   updateLastUsedBinary,
+  recordWorkspaceLaunch,
   updatePreferences,
   updateEnvironmentVariables,
   addEnvironmentVariable,
@@ -318,12 +415,12 @@ const configContextValue: ConfigContextValue = {
 
 const ConfigProvider: ParentComponent = (props) => {
   onMount(() => {
-    ensureConfigLoaded().catch((error) => {
+    ensureConfigLoaded().catch((error: unknown) => {
       console.error("Failed to initialize config:", error)
     })
 
-    const unsubscribe = storage.onConfigChanged(() => {
-      loadConfig().catch((error) => {
+    const unsubscribe = storage.onConfigChanged((config) => {
+      syncConfig(config).catch((error: unknown) => {
         console.error("Failed to refresh config:", error)
       })
     })
@@ -347,7 +444,9 @@ function useConfig(): ConfigContextValue {
 export {
   ConfigProvider,
   useConfig,
+  config,
   preferences,
+  updateConfig,
   updatePreferences,
   toggleShowThinkingBlocks,
   recentFolders,
@@ -366,4 +465,7 @@ export {
   setDiffViewMode,
   setToolOutputExpansion,
   setDiagnosticsExpansion,
+  themePreference,
+  setThemePreference,
+  recordWorkspaceLaunch,
 }

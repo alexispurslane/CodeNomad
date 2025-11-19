@@ -19,17 +19,6 @@ const PreferencesSchema = z.object({
   diagnosticsExpansion: z.enum(["expanded", "collapsed"]).default("expanded"),
 })
 
-const PreferencesUpdateSchema = z.object({
-  showThinkingBlocks: z.boolean().optional(),
-  lastUsedBinary: z.string().optional(),
-  environmentVariables: z.record(z.string()).optional(),
-  modelRecents: z.array(ModelPreferenceSchema).optional(),
-  agentModelSelections: AgentModelSelectionsSchema.optional(),
-  diffViewMode: z.enum(["split", "unified"]).optional(),
-  toolOutputExpansion: z.enum(["expanded", "collapsed"]).optional(),
-  diagnosticsExpansion: z.enum(["expanded", "collapsed"]).optional(),
-})
-
 const RecentFolderSchema = z.object({
   path: z.string(),
   lastAccessed: z.number().nonnegative(),
@@ -49,13 +38,6 @@ const ConfigFileSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).optional(),
 })
 
-const ConfigFileUpdateSchema = z.object({
-  preferences: PreferencesUpdateSchema.optional(),
-  recentFolders: z.array(RecentFolderSchema).optional(),
-  opencodeBinaries: z.array(OpenCodeBinarySchema).optional(),
-  theme: z.enum(["light", "dark", "system"]).optional(),
-})
-
 const DEFAULT_CONFIG = ConfigFileSchema.parse({})
 
 export {
@@ -66,7 +48,6 @@ export {
   RecentFolderSchema,
   OpenCodeBinarySchema,
   ConfigFileSchema,
-  ConfigFileUpdateSchema,
   DEFAULT_CONFIG,
 }
 
@@ -77,4 +58,3 @@ export type Preferences = z.infer<typeof PreferencesSchema>
 export type RecentFolder = z.infer<typeof RecentFolderSchema>
 export type OpenCodeBinary = z.infer<typeof OpenCodeBinarySchema>
 export type ConfigFile = z.infer<typeof ConfigFileSchema>
-export type ConfigFileUpdate = z.infer<typeof ConfigFileUpdateSchema>
