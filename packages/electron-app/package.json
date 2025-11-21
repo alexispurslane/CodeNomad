@@ -1,6 +1,6 @@
 {
   "name": "@neuralnomads/codenomad-electron-app",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "CodeNomad - AI coding assistant",
   "author": {
     "name": "Neural Nomads",
@@ -65,7 +65,10 @@
       {
         "from": "electron/resources",
         "to": "",
-        "filter": ["!icon.icns", "!icon.ico"]
+        "filter": [
+          "!icon.icns",
+          "!icon.ico"
+        ]
       }
     ],
     "mac": {
@@ -73,7 +76,10 @@
       "target": [
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "artifactName": "CodeNomad-${version}-${os}-${arch}.${ext}",
@@ -81,15 +87,26 @@
     },
     "dmg": {
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "win": {
       "target": [
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "artifactName": "CodeNomad-${version}-${os}-${arch}.${ext}",
@@ -105,7 +122,10 @@
       "target": [
         {
           "target": "zip",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "artifactName": "CodeNomad-${version}-${os}-${arch}.${ext}",
