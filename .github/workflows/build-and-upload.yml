@@ -337,6 +337,9 @@ jobs:
       - name: Ensure rollup native binary
         run: npm install @rollup/rollup-linux-x64-gnu --no-save
 
+      - name: Bundle server assets for Tauri
+        run: npm run bundle:server --workspace @codenomad/tauri-app
+
       - name: Build Linux bundle (Tauri)
         run: npm run build --workspace @codenomad/tauri-app
 
@@ -442,12 +445,16 @@ jobs:
           mkdir -p "$ARTIFACT_DIR"
           shopt -s nullglob globstar
           first_artifact=$(find "$SEARCH_ROOT" -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.tar.gz" \) | head -n1)
+          fallback_bin="$SEARCH_ROOT/release/codenomad-tauri"
           if [ -n "$first_artifact" ]; then
-            zip -j "$ARTIFACT_DIR/CodeNomad-Tauri-${VERSION}-linux-arm64.zip" "$first_artifact"
+            zip -j "$ARTIFACT_DIR/CodeNomad-Tauri-${VERSION}-linux-x64.zip" "$first_artifact"
+          elif [ -f "$fallback_bin" ]; then
+            zip -j "$ARTIFACT_DIR/CodeNomad-Tauri-${VERSION}-linux-x64.zip" "$fallback_bin"
           else
-            echo "No bundled artifact found under $SEARCH_ROOT" >&2
+            echo "No bundled artifact found under $SEARCH_ROOT and no binary at $fallback_bin" >&2
             exit 1
           fi
+
 
       - name: Upload Tauri release assets (Linux arm64)
         run: |
