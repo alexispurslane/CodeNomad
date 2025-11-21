@@ -3,8 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cargo tauri dev",
+    "dev": "tauri dev",
     "prebuild": "node ./scripts/prebuild.js",
-    "build": "cargo tauri build"
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.9.4"
   }
+}
+
 }
