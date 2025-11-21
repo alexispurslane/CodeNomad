@@ -65,7 +65,7 @@
       {
         "from": "electron/resources",
         "to": "",
-        "filter": ["!icon.icns", "!icon.ico", "!icon.png"]
+        "filter": ["!icon.icns", "!icon.ico"]
       }
     ],
     "mac": {

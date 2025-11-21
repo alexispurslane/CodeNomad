@@ -342,14 +342,17 @@ jobs:
       - name: Package Tauri artifacts (Linux)
         run: |
           set -euo pipefail
-          BUNDLE_ROOT="packages/tauri-app/target/release/bundle"
+          SEARCH_ROOT="packages/tauri-app/target"
           ARTIFACT_DIR="packages/tauri-app/release-tauri"
           rm -rf "$ARTIFACT_DIR"
           mkdir -p "$ARTIFACT_DIR"
           shopt -s nullglob globstar
-          first_artifact=$(find "$BUNDLE_ROOT" -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.tar.gz" \) | head -n1)
+          first_artifact=$(find "$SEARCH_ROOT" -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.tar.gz" \) | head -n1)
           if [ -n "$first_artifact" ]; then
             zip -j "$ARTIFACT_DIR/CodeNomad-Tauri-${VERSION}-linux-x64.zip" "$first_artifact"
+          else
+            echo "No bundled artifact found under $SEARCH_ROOT" >&2
+            exit 1
           fi
 
       - name: Upload Tauri release assets (Linux)
@@ -391,7 +394,7 @@ jobs:
       - name: Install Linux build dependencies (Tauri)
         run: |
           sudo dpkg --add-architecture arm64
-          sudo apt-get update
+          sudo apt-get update || true
           sudo apt-get install -y \
             build-essential \
             pkg-config \
@@ -425,14 +428,17 @@ jobs:
       - name: Package Tauri artifacts (Linux arm64)
         run: |
           set -euo pipefail
-          BUNDLE_ROOT="packages/tauri-app/target/release/bundle"
+          SEARCH_ROOT="packages/tauri-app/target"
           ARTIFACT_DIR="packages/tauri-app/release-tauri"
           rm -rf "$ARTIFACT_DIR"
           mkdir -p "$ARTIFACT_DIR"
           shopt -s nullglob globstar
-          first_artifact=$(find "$BUNDLE_ROOT" -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.tar.gz" \) | head -n1)
+          first_artifact=$(find "$SEARCH_ROOT" -type f \( -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" -o -name "*.tar.gz" \) | head -n1)
           if [ -n "$first_artifact" ]; then
             zip -j "$ARTIFACT_DIR/CodeNomad-Tauri-${VERSION}-linux-arm64.zip" "$first_artifact"
+          else
+            echo "No bundled artifact found under $SEARCH_ROOT" >&2
+            exit 1
           fi
 
       - name: Upload Tauri release assets (Linux arm64)
