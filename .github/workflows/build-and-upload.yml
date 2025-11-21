@@ -168,8 +168,11 @@ jobs:
       - name: Setup Rust (Tauri)
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        run: curl -L https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
       - name: Install tauri-cli
-        run: cargo install tauri-cli --version 2.0.0-beta.20
+        run: cargo binstall tauri-cli --version 2.0.0-beta.20 --no-confirm
 
       - name: Set workspace versions
         run: npm version ${VERSION} --workspaces --include-workspace-root --no-git-tag-version --allow-same-version
@@ -225,8 +228,11 @@ jobs:
       - name: Setup Rust (Tauri)
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        run: curl -L https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
       - name: Install tauri-cli
-        run: cargo install tauri-cli --version 2.0.0-beta.20
+        run: cargo binstall tauri-cli --version 2.0.0-beta.20 --no-confirm
 
       - name: Set workspace versions
         run: npm version ${VERSION} --workspaces --include-workspace-root --no-git-tag-version --allow-same-version
@@ -282,8 +288,12 @@ jobs:
       - name: Setup Rust (Tauri)
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        run: curl -L https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+        shell: bash
+
       - name: Install tauri-cli
-        run: cargo install tauri-cli --version 2.0.0-beta.20
+        run: cargo binstall tauri-cli --version 2.0.0-beta.20 --no-confirm
         shell: bash
 
       - name: Set workspace versions
@@ -340,8 +350,11 @@ jobs:
       - name: Setup Rust (Tauri)
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        run: curl -L https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
       - name: Install tauri-cli
-        run: cargo install tauri-cli --version 2.0.0-beta.20
+        run: cargo binstall tauri-cli --version 2.0.0-beta.20 --no-confirm
 
       - name: Install Tauri Linux dependencies
         run: |
@@ -402,8 +415,11 @@ jobs:
       - name: Setup Rust (Tauri)
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-binstall
+        run: curl -L https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+
       - name: Install tauri-cli
-        run: cargo install tauri-cli --version 2.0.0-beta.20
+        run: cargo binstall tauri-cli --version 2.0.0-beta.20 --no-confirm
 
       - name: Install Tauri Linux dependencies (arm64)
         run: |
