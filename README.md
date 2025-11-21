@@ -13,10 +13,10 @@ _Manage multiple OpenCode sessions side-by-side._
 ![Command palette overlay](docs/screenshots/command-palette.png)
 _Global command palette for keyboard-first control._
 
-![Image Previews](images/image-previews.png)
+![Image Previews](docs/screenshots/image-previews.png)
 _Rich media previews for images and assets._
 
-![Browser Support](images/browser-support.png)
+![Browser Support](docs/screenshots/browser-support.png)
 _Browser support via CodeNomad Server._
 
 </details>
