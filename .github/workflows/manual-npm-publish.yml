@@ -34,12 +34,14 @@ jobs:
       - name: Build server package (includes UI bundling)
         run: npm run build --workspace @neuralnomads/codenomad
 
+      - name: Set publish metadata
+        run: |
+          echo "VERSION=$(node -p \"require('./package.json').version\")" >> "$GITHUB_ENV"
+          echo "DIST_TAG=dev" >> "$GITHUB_ENV"
+
       - name: Publish server package with provenance
         env:
           NPM_CONFIG_PROVENANCE: true
           NPM_CONFIG_REGISTRY: https://registry.npmjs.org
-          VERSION: $(node -p "require('./package.json').version")
-          DIST_TAG: dev
         run: |
-          npm version ${VERSION} --workspaces --include-workspace-root --no-git-tag-version --allow-same-version
           npm publish --workspace @neuralnomads/codenomad --access public --tag ${DIST_TAG} --provenance
