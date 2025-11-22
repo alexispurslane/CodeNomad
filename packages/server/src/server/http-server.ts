@@ -65,6 +65,10 @@ export function createHttpServer(deps: HttpServerDeps) {
 
   app.register(replyFrom, {
     contentTypesToEncode: [],
+    undici: {
+      bodyTimeout: 0,
+      headersTimeout: 0,
+    },
   })
 
   registerWorkspaceRoutes(app, { workspaceManager: deps.workspaceManager })
