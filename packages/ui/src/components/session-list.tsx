@@ -1,13 +1,14 @@
 import { Component, For, Show, createSignal, createEffect, onCleanup, onMount, createMemo, JSX } from "solid-js"
-import type { Session, SessionStatus } from "../types/session"
+import type { Session, SessionStatus, Agent } from "../types/session"
 import { getSessionStatus } from "../stores/session-status"
-import { MessageSquare, Info, Trash2, Copy } from "lucide-solid"
+import { MessageSquare, Info, Trash2, Copy, Bot, CornerDownRight } from "lucide-solid"
 import KeyboardHint from "./keyboard-hint"
 import Kbd from "./kbd"
 import { keyboardRegistry } from "../lib/keyboard-registry"
 import { formatShortcut } from "../lib/keyboard-utils"
 import { showToastNotification } from "../lib/notifications"
 import { groupSessionsByParent } from "../lib/session-utils"
+import { agents } from "../stores/sessions"
 
 
 interface SessionListProps {
@@ -38,6 +39,26 @@ function formatSessionStatus(status: SessionStatus): string {
     default:
       return "Idle"
   }
+}
+
+function getSessionIcon(session: Session | undefined, instanceAgents: Agent[]): typeof MessageSquare {
+  if (!session) return MessageSquare
+
+  // Check if this is a subagent session (agent with mode === "subagent")
+  const sessionAgent = instanceAgents.find(agent => agent.name === session.agent)
+  if (sessionAgent?.mode === "subagent" ||
+    session.title && session.title.includes(" subagent)")) {
+    return Bot
+  }
+
+  // Check if this is a forked child session
+  if (session.parentId) {
+    return CornerDownRight
+  }
+
+
+  // Default to message bubble for parent sessions
+  return MessageSquare
 }
 
 function arraysEqual(prev: readonly string[] | undefined, next: readonly string[]): boolean {
@@ -97,15 +118,15 @@ const SessionList: Component<SessionListProps> = (props) => {
   createEffect(() => {
     props.onWidthChange?.(sidebarWidth())
   })
- 
+
   const copySessionId = async (event: MouseEvent, sessionId: string) => {
     event.stopPropagation()
- 
+
     try {
       if (typeof navigator === "undefined" || !navigator.clipboard) {
         throw new Error("Clipboard API unavailable")
       }
- 
+
       await navigator.clipboard.writeText(sessionId)
       showToastNotification({ message: "Session ID copied", variant: "success" })
     } catch (error) {
@@ -113,9 +134,9 @@ const SessionList: Component<SessionListProps> = (props) => {
       showToastNotification({ message: "Unable to copy session ID", variant: "error" })
     }
   }
- 
+
   const clampWidth = (width: number) => Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, width))
- 
+
 
   const removeMouseListeners = () => {
     if (mouseMoveHandler) {
@@ -127,7 +148,7 @@ const SessionList: Component<SessionListProps> = (props) => {
       mouseUpHandler = null
     }
   }
- 
+
   const removeTouchListeners = () => {
     if (touchMoveHandler) {
       document.removeEventListener("touchmove", touchMoveHandler)
@@ -138,24 +159,24 @@ const SessionList: Component<SessionListProps> = (props) => {
       touchEndHandler = null
     }
   }
- 
+
   const stopResizing = () => {
     setIsResizing(false)
     removeMouseListeners()
     removeTouchListeners()
   }
- 
+
   const handleMouseMove = (event: MouseEvent) => {
     if (!isResizing()) return
     const diff = event.clientX - startX()
     const newWidth = clampWidth(startWidth() + diff)
     setSidebarWidth(newWidth)
   }
- 
+
   const handleMouseUp = () => {
     stopResizing()
   }
- 
+
   const handleTouchMove = (event: TouchEvent) => {
     if (!isResizing()) return
     const touch = event.touches[0]
@@ -164,24 +185,24 @@ const SessionList: Component<SessionListProps> = (props) => {
     const newWidth = clampWidth(startWidth() + diff)
     setSidebarWidth(newWidth)
   }
- 
+
   const handleTouchEnd = () => {
     stopResizing()
   }
- 
+
   const handleMouseDown = (event: MouseEvent) => {
     event.preventDefault()
     setIsResizing(true)
     setStartX(event.clientX)
     setStartWidth(sidebarWidth())
- 
+
     mouseMoveHandler = handleMouseMove
     mouseUpHandler = handleMouseUp
- 
+
     document.addEventListener("mousemove", handleMouseMove)
     document.addEventListener("mouseup", handleMouseUp)
   }
- 
+
   const handleTouchStart = (event: TouchEvent) => {
     event.preventDefault()
     const touch = event.touches[0]
@@ -189,19 +210,19 @@ const SessionList: Component<SessionListProps> = (props) => {
     setIsResizing(true)
     setStartX(touch.clientX)
     setStartWidth(sidebarWidth())
- 
+
     touchMoveHandler = handleTouchMove
     touchEndHandler = handleTouchEnd
- 
+
     document.addEventListener("touchmove", handleTouchMove)
     document.addEventListener("touchend", handleTouchEnd)
   }
- 
+
   onCleanup(() => {
     removeMouseListeners()
     removeTouchListeners()
   })
- 
+
   const SessionRow: Component<{ sessionId: string; canClose?: boolean }> = (rowProps) => {
     const session = () => props.sessions.get(rowProps.sessionId)
     if (!session()) {
@@ -214,7 +235,9 @@ const SessionList: Component<SessionListProps> = (props) => {
     const pendingPermission = () => Boolean(session()?.pendingPermission)
     const statusClassName = () => (pendingPermission() ? "session-permission" : `session-${status()}`)
     const statusText = () => (pendingPermission() ? "Needs Permission" : statusLabel())
- 
+    const instanceAgents = () => agents().get(props.instanceId) || []
+    const SessionIcon = getSessionIcon(session(), instanceAgents())
+
     return (
        <div class="session-list-item group">
 
@@ -227,7 +250,7 @@ const SessionList: Component<SessionListProps> = (props) => {
         >
           <div class="session-item-row session-item-header">
             <div class="session-item-title-row">
-              <MessageSquare class="w-4 h-4 flex-shrink-0" />
+              <SessionIcon class="w-4 h-4 flex-shrink-0" />
               <span class="session-item-title truncate">{title()}</span>
             </div>
             <Show when={rowProps.canClose}>
@@ -268,9 +291,9 @@ const SessionList: Component<SessionListProps> = (props) => {
       </div>
     )
   }
- 
+
   const sessionsByParent = createMemo(() => groupSessionsByParent(props.sessions))
- 
+
   return (
     <div
 
