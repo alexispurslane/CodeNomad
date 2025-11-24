@@ -1,7 +1,7 @@
 import { Component, For, Show, createSignal, createEffect, onCleanup, onMount, createMemo, JSX } from "solid-js"
 import type { Session, SessionStatus, Agent } from "../types/session"
 import { getSessionStatus } from "../stores/session-status"
-import { MessageSquare, Info, Trash2, Copy, Bot, CornerDownRight } from "lucide-solid"
+import { MessageSquare, Info, Trash2, Copy, Bot, GitFork } from "lucide-solid"
 import KeyboardHint from "./keyboard-hint"
 import Kbd from "./kbd"
 import { keyboardRegistry } from "../lib/keyboard-registry"
@@ -44,16 +44,17 @@ function formatSessionStatus(status: SessionStatus): string {
 function getSessionIcon(session: Session | undefined, instanceAgents: Agent[]): typeof MessageSquare {
   if (!session) return MessageSquare
 
-  // Check if this is a subagent session (agent with mode === "subagent")
-  const sessionAgent = instanceAgents.find(agent => agent.name === session.agent)
-  if (sessionAgent?.mode === "subagent" ||
-    session.title && session.title.includes(" subagent)")) {
+  // Check if this is a subagent session (we have to check
+  // against the session title because CodeNomad has no control
+  // over the Task tool, and OpenCode doesn't send back any agent
+  // data when it creates the Task subagent session)
+  if (session.title?.includes("subagent")) {
     return Bot
   }
 
   // Check if this is a forked child session
   if (session.parentId) {
-    return CornerDownRight
+    return GitFork
   }
 
 
