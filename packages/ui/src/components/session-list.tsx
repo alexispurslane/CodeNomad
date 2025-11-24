@@ -1,7 +1,7 @@
 import { Component, For, Show, createSignal, createEffect, onCleanup, onMount, createMemo, JSX } from "solid-js"
 import type { Session, SessionStatus, Agent } from "../types/session"
 import { getSessionStatus } from "../stores/session-status"
-import { MessageSquare, Info, Trash2, Copy, Bot, GitFork } from "lucide-solid"
+import { MessageSquare, Info, Trash2, Copy, Bot, GitFork, ChevronRight, ChevronDown } from "lucide-solid"
 import KeyboardHint from "./keyboard-hint"
 import Kbd from "./kbd"
 import { keyboardRegistry } from "../lib/keyboard-registry"
@@ -48,12 +48,12 @@ function getSessionIcon(session: Session | undefined, instanceAgents: Agent[]): 
   // against the session title because CodeNomad has no control
   // over the Task tool, and OpenCode doesn't send back any agent
   // data when it creates the Task subagent session)
-  if (session.title?.includes("subagent")) {
+  if (session.title?.includes("subagent)")) {
     return Bot
   }
 
   // Check if this is a forked child session
-  if (session.parentId) {
+  if (false) { // TODO: wait for SDK changes
     return GitFork
   }
 
@@ -87,8 +87,7 @@ const SessionList: Component<SessionListProps> = (props) => {
   const [startWidth, setStartWidth] = createSignal(DEFAULT_WIDTH)
   const [collapsedParents, setCollapsedParents] = createSignal<Set<string>>(new Set())
   const infoShortcut = keyboardRegistry.get("switch-to-info")
-  const COLLAPSE_STORAGE_KEY = `opencode-collapsed-sessions-${props.instanceId}`
-
+  
   const selectSession = (sessionId: string) => {
     props.onSelect(sessionId)
   }
@@ -224,7 +223,7 @@ const SessionList: Component<SessionListProps> = (props) => {
     removeTouchListeners()
   })
 
-  const SessionRow: Component<{ sessionId: string; canClose?: boolean }> = (rowProps) => {
+  const SessionRow: Component<{ sessionId: string; canClose?: boolean; hasChildren?: boolean; isExpanded?: boolean; onToggleExpand?: () => void }> = (rowProps) => {
     const session = () => props.sessions.get(rowProps.sessionId)
     if (!session()) {
       return <></>
@@ -242,58 +241,78 @@ const SessionList: Component<SessionListProps> = (props) => {
     return (
        <div class="session-list-item group">
 
-        <button
-          class={`session-item-base ${isActive() ? "session-item-active" : "session-item-inactive"}`}
-          onClick={() => selectSession(rowProps.sessionId)}
-          title={title()}
-          role="button"
-          aria-selected={isActive()}
-        >
-          <div class="session-item-row session-item-header">
-            <div class="session-item-title-row">
-              <SessionIcon class="w-4 h-4 flex-shrink-0" />
-              <span class="session-item-title truncate">{title()}</span>
-            </div>
-            <Show when={rowProps.canClose}>
-              <span
-                class="session-item-action opacity-80 hover:opacity-100 hover:bg-[var(--status-error)] hover:text-white rounded p-0.5 transition-all"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  props.onClose(rowProps.sessionId)
-                }}
-                role="button"
-                tabIndex={0}
-                aria-label="Delete session"
-                title="Delete session"
-              >
-                <Trash2 class="w-3 h-3" />
-              </span>
-            </Show>
-          </div>
-          <div class="session-item-row session-item-meta">
-            <span class={`status-indicator session-status session-status-list ${statusClassName()}`}>
-              <span class="status-dot" />
-              {statusText()}
-            </span>
-            <div class="session-item-actions">
-              <span
-                class={`session-item-close opacity-80 hover:opacity-100 ${isActive() ? "hover:bg-white/20" : "hover:bg-surface-hover"}`}
-                onClick={(event) => copySessionId(event, rowProps.sessionId)}
-                role="button"
-                tabIndex={0}
-                aria-label="Copy session ID"
-                title="Copy session ID"
-              >
-                <Copy class="w-3 h-3" />
-              </span>
-            </div>
-          </div>
-        </button>
-      </div>
-    )
+         <button
+           class={`session-item-base ${isActive() ? "session-item-active" : "session-item-inactive"}`}
+           onClick={() => selectSession(rowProps.sessionId)}
+           title={title()}
+           role="button"
+           aria-selected={isActive()}
+         >
+           <div class="session-item-row session-item-header">
+             <div class="session-item-title-row">
+               <Show when={rowProps.hasChildren}>
+                 <button
+                   class="session-expand-toggle opacity-60 hover:opacity-100 transition-transform"
+                   onClick={(event) => {
+                     event.stopPropagation()
+                     rowProps.onToggleExpand?.()
+                   }}
+                   aria-label={rowProps.isExpanded ? "Collapse session group" : "Expand session group"}
+                   title={rowProps.isExpanded ? "Collapse" : "Expand"}
+                 >
+                   <Show when={rowProps.isExpanded} fallback={<ChevronRight class="w-4 h-4" />}>
+                     <ChevronDown class="w-4 h-4" />
+                   </Show>
+                 </button>
+               </Show>
+               <SessionIcon class="w-4 h-4 flex-shrink-0" />
+               <span class="session-item-title truncate">{title()}</span>
+             </div>
+             <Show when={rowProps.canClose}>
+               <span
+                 class="session-item-action opacity-80 hover:opacity-100 hover:bg-[var(--status-error)] hover:text-white rounded p-0.5 transition-all"
+                 onClick={(event) => {
+                   event.stopPropagation()
+                   props.onClose(rowProps.sessionId)
+                 }}
+                 role="button"
+                 tabIndex={0}
+                 aria-label="Delete session"
+                 title="Delete session"
+               >
+                 <Trash2 class="w-3 h-3" />
+               </span>
+             </Show>
+           </div>
+           <div class="session-item-row session-item-meta">
+             <span class={`status-indicator session-status session-status-list ${statusClassName()}`}>
+               <span class="status-dot" />
+               {statusText()}
+             </span>
+             <div class="session-item-actions">
+               <span
+                 class={`session-item-close opacity-80 hover:opacity-100 ${isActive() ? "hover:bg-white/20" : "hover:bg-surface-hover"}`}
+                 onClick={(event) => copySessionId(event, rowProps.sessionId)}
+                 role="button"
+                 tabIndex={0}
+                 aria-label="Copy session ID"
+                 title="Copy session ID"
+               >
+                 <Copy class="w-3 h-3" />
+               </span>
+             </div>
+           </div>
+         </button>
+       </div>
+     )
   }
 
   const sessionsByParent = createMemo(() => groupSessionsByParent(props.sessions))
+
+  createEffect(() => {
+    setCollapsedParents(prev => new Set(sessionsByParent().map(x => x.parent.id)))
+  })
+
 
   return (
     <div
@@ -353,18 +372,41 @@ const SessionList: Component<SessionListProps> = (props) => {
               Sessions ({props.sessions.size} total)
             </div>
             <For each={sessionsByParent()}>
-              {({ parent, children }) => (
-                <div class="session-group">
-                  <SessionRow sessionId={parent.id} canClose />
-                  <Show when={children.length > 0}>
-                    <div class="ml-4 border-l border-base pl-3">
-                      <For each={children}>
-                        {(child) => <SessionRow sessionId={child.id} />}
-                      </For>
-                    </div>
-                  </Show>
-                </div>
-              )}
+              {({ parent, children }) => {
+                const hasChildren = children.length > 0
+                const isParentActive = () => props.activeSessionId === parent.id
+                const isChildActive = () => children.some(child => props.activeSessionId === child.id)
+                const isExpanded = () => !collapsedParents().has(parent.id) || (isParentActive() || isChildActive())
+
+                return (
+                  <div class="session-group">
+                    <SessionRow
+                      sessionId={parent.id}
+                      canClose
+                      hasChildren={hasChildren}
+                      isExpanded={isExpanded()}
+                      onToggleExpand={() => {
+                        setCollapsedParents(prev => {
+                          const next = new Set(prev)
+                          if (next.has(parent.id)) {
+                            next.delete(parent.id)
+                          } else {
+                            next.add(parent.id)
+                          }
+                          return next
+                        })
+                      }}
+                    />
+                    <Show when={hasChildren && isExpanded()}>
+                      <div class="ml-4 border-l border-base pl-3">
+                        <For each={children}>
+                          {(child) => <SessionRow sessionId={child.id} />}
+                        </For>
+                      </div>
+                    </Show>
+                  </div>
+                )
+              }}
             </For>
           </div>
         </Show>

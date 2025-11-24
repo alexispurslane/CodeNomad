@@ -5,9 +5,7 @@ export interface SessionGroup {
   children: Session[];
 }
 
-export function groupSessionsByParent(
-  sessions: Map<string, Session> | Session[],
-): SessionGroup[] {
+export function groupSessionsByParent(sessions: Map<string, Session> | Session[]): SessionGroup[] {
   const sessionArray = Array.isArray(sessions)
     ? sessions
     : Array.from(sessions.values());
@@ -20,8 +18,8 @@ export function groupSessionsByParent(
   }
 
   for (const session of sessionArray) {
-    const isSubAgent = session.title?.includes("subagent");
     if (session.parentId !== null) {
+      const isSubAgent = session.title?.includes("subagent)");
       if (isSubAgent) {
         const group = grouped.get(session.parentId);
         if (group) {
