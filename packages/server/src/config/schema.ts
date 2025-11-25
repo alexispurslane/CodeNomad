@@ -16,6 +16,7 @@ const PreferencesSchema = z.object({
   diffViewMode: z.enum(["split", "unified"]).default("split"),
   toolOutputExpansion: z.enum(["expanded", "collapsed"]).default("expanded"),
   diagnosticsExpansion: z.enum(["expanded", "collapsed"]).default("expanded"),
+  showUsageMetrics: z.boolean().default(true),
 })
 
 const RecentFolderSchema = z.object({
