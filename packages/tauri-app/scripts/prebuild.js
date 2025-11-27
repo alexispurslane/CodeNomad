@@ -17,6 +17,8 @@ const serverInstallCommand =
   "npm install --omit=dev --ignore-scripts --workspaces=false --package-lock=false --install-strategy=shallow --fund=false --audit=false"
 const serverDevInstallCommand =
   "npm ci --workspace @neuralnomads/codenomad --include-workspace-root=false --install-strategy=nested --fund=false --audit=false"
+const uiDevInstallCommand =
+  "npm ci --workspace @codenomad/ui --include-workspace-root=false --install-strategy=nested --fund=false --audit=false"
 
 const envWithRootBin = {
   ...process.env,
@@ -32,6 +34,8 @@ const braceExpansionPath = path.join(
   "brace-expansion",
   "package.json",
 )
+
+const viteBinPath = path.join(uiRoot, "node_modules", ".bin", "vite")
 
 function ensureServerBuild() {
   const distPath = path.join(serverRoot, "dist")
@@ -97,6 +101,19 @@ function ensureServerDependencies() {
   })
 }
 
+function ensureUiDevDependencies() {
+  if (fs.existsSync(viteBinPath)) {
+    return
+  }
+
+  console.log("[prebuild] ensuring ui build dependencies...")
+  execSync(uiDevInstallCommand, {
+    cwd: workspaceRoot,
+    stdio: "inherit",
+    env: envWithRootBin,
+  })
+}
+
 function copyServerArtifacts() {
   fs.rmSync(serverDest, { recursive: true, force: true })
   fs.mkdirSync(serverDest, { recursive: true })
@@ -133,6 +150,7 @@ function copyUiLoadingAssets() {
 }
 
 ensureServerDevDependencies()
+ensureUiDevDependencies()
 ensureServerBuild()
 ensureUiBuild()
 ensureServerDependencies()
