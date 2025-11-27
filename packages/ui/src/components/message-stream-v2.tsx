@@ -320,6 +320,7 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
       const infoError = (messageInfo as { error?: { name?: string } } | undefined)?.error
       const infoErrorName = typeof infoError?.name === "string" ? infoError.name : ""
       const cacheSignature = [
+        record.id,
         record.revision,
         isQueued ? 1 : 0,
         showThinking ? 1 : 0,
@@ -577,24 +578,41 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
      })
    }
  
-   function handleScroll(event: Event) {
-     if (!containerRef) return
-     updateScrollIndicators(containerRef)
-     if (event.isTrusted) {
-       const atBottom = isNearBottom(containerRef)
-       if (!atBottom) {
-         setAutoScroll(false)
-       } else {
-         setAutoScroll(true)
-       }
-     }
-     scheduleScrollPersist()
-   }
+  function handleScroll(event: Event) {
+    if (!containerRef) return
+    updateScrollIndicators(containerRef)
+    if (event.isTrusted) {
+      const atBottom = isNearBottom(containerRef)
+      if (!atBottom) {
+        setAutoScroll(false)
+      } else {
+        setAutoScroll(true)
+      }
+    }
+    scheduleScrollPersist()
+  }
  
-   let previousToken: string | undefined
-
-
   createEffect(() => {
+    const target = containerRef
+    if (!target) return
+    scrollCache.restore(target, {
+      fallback: () => scrollToBottom(true),
+      onApplied: (snapshot) => {
+        if (snapshot) {
+          setAutoScroll(snapshot.atBottom)
+        } else {
+          const atBottom = isNearBottom(target)
+          setAutoScroll(atBottom)
+        }
+        updateScrollIndicators(target)
+      },
+    })
+  })
+ 
+  let previousToken: string | undefined
+ 
+  createEffect(() => {
+
     const token = changeToken()
     if (!token || token === previousToken) {
       return
