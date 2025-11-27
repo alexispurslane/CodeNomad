@@ -16,9 +16,9 @@ const sources = ["dist", "public", "node_modules", "package.json"]
 const serverInstallCommand =
   "npm install --omit=dev --ignore-scripts --workspaces=false --package-lock=false --install-strategy=shallow --fund=false --audit=false"
 const serverDevInstallCommand =
-  "npm ci --workspace @neuralnomads/codenomad --include-workspace-root=false --install-strategy=nested --fund=false --audit=false"
+  "npm install --workspace @neuralnomads/codenomad --include-workspace-root=false --install-strategy=nested --fund=false --audit=false"
 const uiDevInstallCommand =
-  "npm ci --workspace @codenomad/ui --include-workspace-root=false --install-strategy=nested --fund=false --audit=false"
+  "npm install --workspace @codenomad/ui --include-workspace-root=false --install-strategy=nested --fund=false --audit=false"
 
 const envWithRootBin = {
   ...process.env,
