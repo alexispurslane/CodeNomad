@@ -24,6 +24,7 @@ export interface UseCommandsOptions {
   setDiffViewMode: (mode: "split" | "unified") => void
   setToolOutputExpansion: (mode: ExpansionPreference) => void
   setDiagnosticsExpansion: (mode: ExpansionPreference) => void
+  setThinkingBlocksExpansion: (mode: ExpansionPreference) => void
   handleNewInstanceRequest: () => void
   handleCloseInstance: (instanceId: string) => Promise<void>
   handleNewSession: (instanceId: string) => Promise<void>
@@ -385,8 +386,24 @@ export function useCommands(options: UseCommandsOptions) {
       label: () => `${options.preferences().showThinkingBlocks ? "Hide" : "Show"} Thinking Blocks`,
       description: "Show/hide AI thinking process",
       category: "System",
-      keywords: ["/thinking", "toggle", "show", "hide"],
+      keywords: ["/thinking", "thinking", "reasoning", "toggle", "show", "hide"],
       action: options.toggleShowThinkingBlocks,
+    })
+
+    commandRegistry.register({
+      id: "thinking-default-visibility",
+      label: () => {
+        const mode = options.preferences().thinkingBlocksExpansion ?? "expanded"
+        return `Thinking Blocks Default · ${mode === "expanded" ? "Expanded" : "Collapsed"}`
+      },
+      description: "Toggle whether thinking blocks start expanded",
+      category: "System",
+      keywords: ["/thinking", "thinking", "reasoning", "expand", "collapse", "default"],
+      action: () => {
+        const mode = options.preferences().thinkingBlocksExpansion ?? "expanded"
+        const next: ExpansionPreference = mode === "expanded" ? "collapsed" : "expanded"
+        options.setThinkingBlocksExpansion(next)
+      },
     })
 
     commandRegistry.register({

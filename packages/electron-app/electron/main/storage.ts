@@ -59,7 +59,7 @@ export function setupStorageIPC() {
       return await readConfigWithCache()
     } catch (error) {
       // Return empty config if file doesn't exist
-      return JSON.stringify({ preferences: { showThinkingBlocks: false }, recentFolders: [] }, null, 2)
+      return JSON.stringify({ preferences: { showThinkingBlocks: false, thinkingBlocksExpansion: "expanded" }, recentFolders: [] }, null, 2)
     }
   })
 

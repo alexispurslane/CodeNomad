@@ -10,6 +10,7 @@ const AgentModelSelectionsSchema = z.record(z.string(), AgentModelSelectionSchem
 
 const PreferencesSchema = z.object({
   showThinkingBlocks: z.boolean().default(false),
+  thinkingBlocksExpansion: z.enum(["expanded", "collapsed"]).default("expanded"),
   lastUsedBinary: z.string().optional(),
   environmentVariables: z.record(z.string()).default({}),
   modelRecents: z.array(ModelPreferenceSchema).default([]),

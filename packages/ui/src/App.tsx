@@ -51,6 +51,7 @@ const App: Component = () => {
     setDiffViewMode,
     setToolOutputExpansion,
     setDiagnosticsExpansion,
+    setThinkingBlocksExpansion,
   } = useConfig()
   const [escapeInDebounce, setEscapeInDebounce] = createSignal(false)
   const [launchErrorBinary, setLaunchErrorBinary] = createSignal<string | null>(null)
@@ -210,6 +211,7 @@ const App: Component = () => {
     setDiffViewMode,
     setToolOutputExpansion,
     setDiagnosticsExpansion,
+    setThinkingBlocksExpansion,
     handleNewInstanceRequest,
     handleCloseInstance,
     handleNewSession,

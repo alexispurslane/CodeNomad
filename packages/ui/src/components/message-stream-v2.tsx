@@ -23,6 +23,10 @@ const codeNomadLogo = new URL("../images/CodeNomad-Icon.png", import.meta.url).h
 const messageItemCache = new Map<string, ContentDisplayItem>()
 const toolItemCache = new Map<string, ToolDisplayItem>()
 
+const USER_BORDER_COLOR = "var(--message-user-border)"
+const ASSISTANT_BORDER_COLOR = "var(--message-assistant-border)"
+const TOOL_BORDER_COLOR = "var(--message-tool-border)"
+
 type ToolCallPart = Extract<ClientPart, { type: "tool" }>
 
 type ToolState = import("@opencode-ai/sdk").ToolState
@@ -139,6 +143,7 @@ interface StepDisplayItem {
   key: string
   part: ClientPart
   messageInfo?: MessageInfo
+  accentColor?: string
 }
 
 type ReasoningDisplayItem = {
@@ -147,6 +152,7 @@ type ReasoningDisplayItem = {
   part: ClientPart
   messageInfo?: MessageInfo
   showAgentMeta?: boolean
+  defaultExpanded: boolean
 }
 
 type MessageBlockItem = ContentDisplayItem | ToolDisplayItem | StepDisplayItem | ReasoningDisplayItem
@@ -261,6 +267,7 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
     const infoMap = messageInfoMap()
     const showThinking = preferences().showThinkingBlocks
     const showUsageMetrics = showUsagePreference()
+    const thinkingDefaultExpanded = (preferences().thinkingBlocksExpansion ?? "expanded") === "expanded"
     const revert = revertTarget()
     const instanceId = props.instanceId
     const blocks: MessageDisplayBlock[] = []
@@ -284,6 +291,8 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
       let segmentIndex = 0
       let pendingParts: ClientPart[] = []
       let agentMetaAttached = record.role !== "assistant"
+      const defaultAccentColor = record.role === "user" ? USER_BORDER_COLOR : ASSISTANT_BORDER_COLOR
+      let lastAccentColor = defaultAccentColor
 
       const flushContent = () => {
         if (pendingParts.length === 0) return
@@ -317,6 +326,7 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
         }
         items.push(cached)
         usedMessageKeys.add(segmentKey)
+        lastAccentColor = defaultAccentColor
         pendingParts = []
       }
 
@@ -349,6 +359,7 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
           }
           items.push(toolItem)
           usedToolKeys.add(cacheKey)
+          lastAccentColor = TOOL_BORDER_COLOR
           return
         }
 
@@ -361,7 +372,9 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
           flushContent()
           if (showUsageMetrics) {
             const key = makeInstanceCacheKey(instanceId, `${record.id}:${part.id ?? partIndex}:${part.type}`)
-            items.push({ type: part.type, key, part, messageInfo })
+            const accentColor = lastAccentColor || defaultAccentColor
+            items.push({ type: part.type, key, part, messageInfo, accentColor })
+            lastAccentColor = accentColor
           }
           return
         }
@@ -374,7 +387,15 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
             if (showAgentMeta) {
               agentMetaAttached = true
             }
-            items.push({ type: "reasoning", key, part, messageInfo, showAgentMeta })
+            items.push({
+              type: "reasoning",
+              key,
+              part,
+              messageInfo,
+              showAgentMeta,
+              defaultExpanded: thinkingDefaultExpanded,
+            })
+            lastAccentColor = ASSISTANT_BORDER_COLOR
           }
           return
         }
@@ -707,6 +728,7 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
                         part={(item as StepDisplayItem).part}
                         messageInfo={(item as StepDisplayItem).messageInfo}
                         showUsage={showUsagePreference()}
+                        borderColor={(item as StepDisplayItem).accentColor}
                       />
                     </Match>
                     <Match when={item.type === "reasoning"}>
@@ -716,6 +738,7 @@ export default function MessageStreamV2(props: MessageStreamV2Props) {
                         instanceId={props.instanceId}
                         sessionId={props.sessionId}
                         showAgentMeta={(item as ReasoningDisplayItem).showAgentMeta}
+                        defaultExpanded={(item as ReasoningDisplayItem).defaultExpanded}
                       />
                     </Match>
                   </Switch>
@@ -764,6 +787,7 @@ interface StepCardProps {
   messageInfo?: MessageInfo
   showAgentMeta?: boolean
   showUsage?: boolean
+  borderColor?: string
 }
 
 function StepCard(props: StepCardProps) {
@@ -815,6 +839,8 @@ function StepCard(props: StepCardProps) {
     }
   }
 
+  const finishStyle = () => (props.borderColor ? { "border-left-color": props.borderColor } : undefined)
+
   const renderUsageChips = (usage: NonNullable<ReturnType<typeof usageStats>>) => (
     <div class="message-step-usage">
       <div class="inline-flex items-center gap-1 rounded-full border border-[var(--border-base)] px-2 py-0.5 text-[10px]">
@@ -850,7 +876,7 @@ function StepCard(props: StepCardProps) {
       return null
     }
     return (
-      <div class={`message-step-card message-step-finish`}>
+      <div class={`message-step-card message-step-finish message-step-finish-flush`} style={finishStyle()}>
         {renderUsageChips(usage)}
       </div>
     )
@@ -886,10 +912,15 @@ interface ReasoningCardProps {
   instanceId: string
   sessionId: string
   showAgentMeta?: boolean
+  defaultExpanded?: boolean
 }
 
 function ReasoningCard(props: ReasoningCardProps) {
-  const [expanded, setExpanded] = createSignal(false)
+  const [expanded, setExpanded] = createSignal(Boolean(props.defaultExpanded))
+
+  createEffect(() => {
+    setExpanded(Boolean(props.defaultExpanded))
+  })
 
   const timestamp = () => {
     const value = props.messageInfo?.time?.created ?? (props.part as any)?.time?.start ?? Date.now()

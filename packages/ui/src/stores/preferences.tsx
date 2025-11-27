@@ -29,6 +29,7 @@ export type ExpansionPreference = "expanded" | "collapsed"
 
 export interface Preferences {
   showThinkingBlocks: boolean
+  thinkingBlocksExpansion: ExpansionPreference
   lastUsedBinary?: string
   environmentVariables: Record<string, string>
   modelRecents: ModelPreference[]
@@ -56,6 +57,7 @@ const MAX_RECENT_MODELS = 5
 
 const defaultPreferences: Preferences = {
   showThinkingBlocks: false,
+  thinkingBlocksExpansion: "expanded",
   environmentVariables: {},
   modelRecents: [],
   diffViewMode: "split",
@@ -88,6 +90,7 @@ function normalizePreferences(pref?: Partial<Preferences> & { agentModelSelectio
 
   return {
     showThinkingBlocks: sanitized.showThinkingBlocks ?? defaultPreferences.showThinkingBlocks,
+    thinkingBlocksExpansion: sanitized.thinkingBlocksExpansion ?? defaultPreferences.thinkingBlocksExpansion,
     lastUsedBinary: sanitized.lastUsedBinary ?? defaultPreferences.lastUsedBinary,
     environmentVariables,
     modelRecents,
@@ -269,6 +272,11 @@ function setDiagnosticsExpansion(mode: ExpansionPreference): void {
   updatePreferences({ diagnosticsExpansion: mode })
 }
 
+function setThinkingBlocksExpansion(mode: ExpansionPreference): void {
+  if (preferences().thinkingBlocksExpansion === mode) return
+  updatePreferences({ thinkingBlocksExpansion: mode })
+}
+
 function toggleShowThinkingBlocks(): void {
   updatePreferences({ showThinkingBlocks: !preferences().showThinkingBlocks })
 }
@@ -381,6 +389,7 @@ interface ConfigContextValue {
   setDiffViewMode: typeof setDiffViewMode
   setToolOutputExpansion: typeof setToolOutputExpansion
   setDiagnosticsExpansion: typeof setDiagnosticsExpansion
+  setThinkingBlocksExpansion: typeof setThinkingBlocksExpansion
   addRecentFolder: typeof addRecentFolder
   removeRecentFolder: typeof removeRecentFolder
   addOpenCodeBinary: typeof addOpenCodeBinary
@@ -412,6 +421,7 @@ const configContextValue: ConfigContextValue = {
   setDiffViewMode,
   setToolOutputExpansion,
   setDiagnosticsExpansion,
+  setThinkingBlocksExpansion,
   addRecentFolder,
   removeRecentFolder,
   addOpenCodeBinary,
@@ -480,7 +490,9 @@ export {
   setDiffViewMode,
   setToolOutputExpansion,
   setDiagnosticsExpansion,
+  setThinkingBlocksExpansion,
   themePreference,
   setThemePreference,
   recordWorkspaceLaunch,
-}
+ }
+
